@@ -11,26 +11,28 @@ IMGBB_KEY = "***REMOVED***"
 class discord_bot:
     def __init__(self, wait_time: int = 60, url: str = WEBHOOK_URL):
         self.url = url
-        self.last_upload = ""
+        self.last_upload = []
         self.data = {}
         self.wait_time = wait_time
         self.epoch = -1
     
-    def update_data_img(self, epoch_num, i):
-        content = [f"Epoch {epoch_num}", "Overall", "Epoch Quartiles"]
+    def update_data_img(self, epoch_num):
+        content = "Epoch {epoch_num+1}"
         self.data = {
-            "content" : content[i],
+            "content" : content,
             "username" : "Doom Guy",
             "embeds" : [{
-                "image" : {"url" : self.last_upload},
+                "image" : {"url" : img},
                 "type" : "rich"
-                }]
+                } for img in self.last_upload]
         }
 
     def send_img(self, epoch_num):
+        self.last_upload = []
         file_names = [f"plots/{epoch_num}.png", f"plots/{epoch_num}a.png"]
-        if (epoch_num+1)%10 is 0:
-            file_names.append("plots/epoch_quartiles.png")
+        if (epoch_num+1)%5 is 0:
+            file_names.append("plots/train_quartiles.png")
+            file_names.append("plots/train_kill_counts.png")
         for i in range(len(file_names)):
             with open(file_names[i], "rb") as file:
                 url = "https://api.imgbb.com/1/upload"
@@ -39,13 +41,23 @@ class discord_bot:
                     "image" : b64encode(file.read()),
                     "name" : f"test_{epoch_num:03d}"
                 }
-            result = requests.post(url, payload)
-            self.last_upload = result.json()["data"]["display_url"]
-            self.update_data_img(epoch_num, i)
-            result = requests.post(self.url, json = self.data)
             try:
-                result.raise_for_status()
-            except requests.exceptions.HTTPError as err:
-                print(err)
-            else:
-                print("Payload delivered successfully, code {}.".format(result.status_code))
+                result = requests.post(url, payload)
+                self.last_upload.append(result.json()["data"]["display_url"])
+            except:
+                print(f"Unable to upload {file_names[i] %epoch_num}")
+        try:
+            self.update_data_img(epoch_num)
+            result = requests.post(self.url, json = self.data)
+        except:
+            print(f"Unable to send images for epoch {epoch_num+1}")
+    
+    def send_stat(self, content):
+        stat_data = {
+            "content" : content,
+            "username" : "Doom Guy"
+        }
+        try:
+            result = requests.post(self.url, json = stat_data)
+        except:
+            print(f"Unable to send stats")

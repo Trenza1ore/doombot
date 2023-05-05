@@ -29,6 +29,7 @@ def create_game(config_path: str, color: bool=False, depth: bool=True, label: bo
     if "spec" not in kwargs:
         # set "cheating" buffer access
         game.set_depth_buffer_enabled(depth)
+        game.set_labels_buffer_enabled(label)
         game.set_automap_buffer_enabled(automap)
         if "automap_config" in kwargs:
             config = kwargs["automap_config"]

@@ -162,3 +162,4 @@ _vizdoom.ini
 *.npy
 *.pth
 *.ipynb
+test.py

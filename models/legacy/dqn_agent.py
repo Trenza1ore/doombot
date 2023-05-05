@@ -69,7 +69,6 @@ class DQN_agent:
             
         if not inference:
             self.rand_num = self.batch_size // self.replay_mem_runs
-            self.criterion = nn.MSELoss()
             self.optimiser = optim.Adam(self.q_net.parameters(), lr=self.lr, weight_decay=self.wd)
             self.memory = deque(maxlen=self.mem_size)
             self.rng = default_rng()
