@@ -188,8 +188,12 @@ class ReplayMemory:
         scores = scores - np.min(scores)
         scores[:self.history_len] = 0
         scores[self.__ptr] = 0
+        scores[self.rewards == 0] = 0
         scores /= np.sum(scores)
-        return self.rng.choice(self.indices, size=n, replace=r, p=scores)
+        indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
+        if np.any(self.features[indices, 0] != self.features[indices+1, 0]):
+            return self.replay_p(n, r)
+        return indices
     
     # def replay(self, n: int) -> tuple[np.ndarray[np.integer], np.ndarray[np.floating]]:
     #     random_indices = randint(0, self.max_size, size=n)

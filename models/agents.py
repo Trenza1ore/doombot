@@ -19,7 +19,7 @@ class CombatAgent:
                  act_wd: float=0, nav_wd: float=0, optimizer=optim.SGD, 
                  state_len: int=10, act_model=DRQNv1, nav_model=DRQNv1,
                  eps: float=1, eps_decay: float=0.99, eps_min: float=0.1,
-                 seed=time()) -> None:
+                 seed=int(time())) -> None:
         
         # store model hyper parameters
         self.device = device
@@ -58,7 +58,7 @@ class CombatAgent:
     
     def decide_move_nav(self, state: np.ndarray) -> torch.tensor:
         if self.rng.uniform() < self.eps:
-            return self.rng.integers(1, self.nav_action_num)
+            return self.rng.integers(0, self.nav_action_num)
         else:
             state = torch.from_numpy(state).float().cuda()
             self.nav_net.inf_feature(state)
@@ -66,7 +66,7 @@ class CombatAgent:
     
     def decide_move(self, state: np.ndarray, is_combat: bool) -> torch.tensor:
         if self.rng.uniform() < self.eps:
-            return self.rng.integers(1, self.action_num) if is_combat else self.rng.integers(1, self.nav_action_num)
+            return self.rng.integers(0, self.action_num) if is_combat else self.rng.integers(0, self.nav_action_num)
         else:
             state = torch.from_numpy(state).float().cuda()
             if is_combat:
@@ -78,7 +78,7 @@ class CombatAgent:
     
     def decide_move_blind(self, state: np.ndarray) -> torch.tensor:
         if self.rng.uniform() < self.eps:
-            return self.rng.integers(1, self.action_num)
+            return self.rng.integers(0, self.action_num)
         else:
             state = torch.from_numpy(state).float().cuda()
             if self.act_net.inf_feature(state) > 0.5:
@@ -130,7 +130,7 @@ class CombatAgent:
         del current
         torch.cuda.empty_cache()
     
-    def train(self, batch_size: int=10, feature_loss_factor: float=100):
+    def train(self, batch_size: int=5, feature_loss_factor: float=100):
         indices = self.memory.replay_p(batch_size)
         for i in indices:
             start, end  = i-self.history_len, i+2
@@ -149,17 +149,20 @@ class CombatAgent:
                 s_end = s_start + self.padding_len
                 current = s_end-1
                 
+                if is_combat[current] != is_combat[s_end]:
+                    continue
+                
                 # Distinguish between combat and navigation task
                 if is_combat[current]:
                     model   = self.act_net
                     feature = is_combat.copy()
                     optimizer = self.act_optimizer
-                    current_action = actions[current]
                 else:
                     model   = self.nav_net
                     feature = is_right_dir.copy()
                     optimizer = self.nav_optimizer
-                    current_action = actions[current] % 8
+                
+                current_action = actions[current]
                 
                 # Predict game features and action values for the next state
                 with torch.no_grad():
@@ -185,4 +188,4 @@ class CombatAgent:
                 optimizer.zero_grad()
                 (action_value_loss + game_feature_loss).backward()
                 optimizer.step()
-        self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps
+        self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min

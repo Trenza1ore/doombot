@@ -17,7 +17,7 @@ class discord_bot:
         self.epoch = -1
     
     def update_data_img(self, epoch_num):
-        content = "Epoch {epoch_num+1}"
+        content = f"Epoch {epoch_num+1}"
         self.data = {
             "content" : content,
             "username" : "Doom Guy",
@@ -30,9 +30,9 @@ class discord_bot:
     def send_img(self, epoch_num):
         self.last_upload = []
         file_names = [f"plots/{epoch_num}.png", f"plots/{epoch_num}a.png"]
-        if (epoch_num+1)%5 is 0:
-            file_names.append("plots/train_quartiles.png")
-            file_names.append("plots/train_kill_counts.png")
+        #if (epoch_num+1)%5 is 0:
+        file_names.append("plots/train_quartiles.png")
+        file_names.append("plots/train_kill_counts.png")
         for i in range(len(file_names)):
             with open(file_names[i], "rb") as file:
                 url = "https://api.imgbb.com/1/upload"

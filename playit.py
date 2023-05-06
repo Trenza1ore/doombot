@@ -1,7 +1,8 @@
 import vizdoom as vzd
 import os
 
-config_file_path = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
+config_file_path = os.path.join(vzd.scenarios_path, "defend_the_line.cfg")
+#config_file_path = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
 #config_file_path = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")
 
 def create_game(config_path: str, color: bool = False, res: int = 240, visibility: bool = False) -> vzd.vizdoom.DoomGame:
