@@ -18,8 +18,10 @@ from vizdoom_utils import *
 from stat_plotter import plot_stat
 from training_procedure import train_agent
 
-combat_config = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")
-navigation_config = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
+# combat_config = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")
+# navigation_config = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
+
+combat_config = os.path.join(vzd.scenarios_path, "deathmatch_hugo.cfg")
 
 def check_gpu() -> torch.device:
     # Uses GPU if available
@@ -34,7 +36,6 @@ def check_gpu() -> torch.device:
             
 def main():
     game = create_game(combat_config, color=True, label=True, res=(256, 144), visibility=True)
-    nav_game = create_game(navigation_config, color=True, label=True, res=(256, 144), visibility=True)
     DEVICE = check_gpu()
     n = game.get_available_buttons_size()
     act_actions = [list(a) for a in it.product([False, True], repeat=n)]
@@ -57,10 +58,10 @@ def main():
     
     agent = CombatAgent(
         device=DEVICE, mem_size=100_000, action_num=len(act_actions), nav_action_num=len(nav_actions), 
-        discount=0.99, lr=0.1, loss=nn.HuberLoss, act_wd=0, nav_wd=0, optimizer=Adam, state_len=10,
-        act_model=DRQNv2, nav_model=DQNv1, eps=1., eps_decay=0.99996, eps_min=0.1)
+        discount=0.99, lr=0.1, dropout=0.5, loss=nn.HuberLoss, act_wd=0, nav_wd=0, optimizer=Adam, 
+        state_len=10, act_model=DRQNv2, nav_model=DQNv1, eps=1., eps_decay=0.99996, eps_min=0.1)
     
-    _, _, scores = train_agent(game=game, nav_game=nav_game, agent=agent, action_space=act_actions, 
+    _, _, scores = train_agent(game=game, agent=agent, action_space=act_actions, 
                                nav_action_space=nav_actions, episode_to_watch=10, skip_training=False, 
                                plot=True, discord=True, epoch_num=100, frame_repeat=4, epoch_step=5000, 
                                load_epoch=-1, res=(128, 72))

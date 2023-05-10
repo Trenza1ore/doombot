@@ -16,7 +16,7 @@ from discord_webhook import discord_bot
 from vizdoom_utils import *
 from stat_plotter import plot_stat
 
-def train_agent(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomGame, 
+def train_agent(game: vzd.vizdoom.DoomGame, 
                 agent: CombatAgent, action_space: list, nav_action_space: list, 
                 episode_to_watch: int, skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 

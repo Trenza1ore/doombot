@@ -5,8 +5,7 @@ import torch.nn.functional as F
 from numpy.random import default_rng
 import numpy as np
 
-from models.DRQN import DRQNv2
-from models.DQN import DQNv1
+from models.DQN import DQNv1, DRQNv1, DRQNv2
 from models.replay_memory import ReplayMemory
 from vizdoom_utils import *
 from time import time
@@ -45,12 +44,14 @@ class CombatAgent:
         # set up models
         self.criterion = loss()
         self.act_net = act_model(action_num=action_num, feature_num=1, dropout=dropout).to(device)
+        self.act_net.train()
         if nav_model == None:
             self.no_nav = True
             self.train = self.train_no_nav
         else:
             self.no_nav = False
             self.nav_net = nav_model(action_num=nav_action_num, dropout=dropout).to(device)
+            self.nav_net.train()
         
         # set up optimizer (a dict type lr means PPO is used)
         if type(lr) == dict:
@@ -67,7 +68,7 @@ class CombatAgent:
         # set up memory for priorotized experience replay
         dtypes = [np.uint8, np.float16, 'bool', 'bool']
         dtypes.append('bool') if nav_req_feature else None
-        self.memory = ReplayMemory(res=(60, 108), ch_num=3, size=mem_size, 
+        self.memory = ReplayMemory(res=(72, 128), ch_num=3, size=mem_size, 
                                    history_len=state_len-2, future_len=1, 
                                    dtypes=dtypes)
     
@@ -130,7 +131,6 @@ class CombatAgent:
         torch.cuda.empty_cache()
     
     def train(self, batch_size: int=5, feature_loss_factor: float=10.):
-        self.act_net.train()
         indices = self.memory.replay_p(batch_size)
         for i in indices:
             start, end  = i-self.history_len, i+2
@@ -187,15 +187,15 @@ class CombatAgent:
                 # Predict action values for the current state
                 if is_combat_state:
                     model.inf_feature(torch.from_numpy(frames[s_start:s_end, :, :, :]).float().cuda())
-                    pred_action = model.inf_action()[-1, current_action]
+                    pred_action = torch.max(model.inf_action()[-1, current_action])
                 else:
-                    pred_action = model(torch.from_numpy(frames[current, :, :, :]).float().cuda())
+                    pred_action = torch.max(model(torch.from_numpy(frames[current, :, :, :]).float().cuda()))
                 
                 # Calculate loss for action values
                 loss = self.criterion(q_target, pred_action)+game_feature_loss \
                     if is_combat_state else self.criterion(q_target, pred_action)
-                optimizer.zero_grad()
                 
+                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
         self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
