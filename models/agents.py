@@ -19,7 +19,7 @@ class CombatAgent:
                  act_wd: float=0, nav_wd: float=0, optimizer=optim.SGD, 
                  state_len: int=10, act_model=DRQNv1, nav_model=DRQNv1,
                  eps: float=1, eps_decay: float=0.99, eps_min: float=0.1,
-                 seed=int(time())) -> None:
+                 nav_req_feature: bool=False, seed=int(time())) -> None:
         
         # store model hyper parameters
         self.device = device
@@ -65,26 +65,10 @@ class CombatAgent:
         
         # set up memory for priorotized experience replay
         dtypes = [np.uint8, np.float16, 'bool', 'bool']
-        0 if self.no_nav else dtypes.append('bool')
+        dtypes.append('bool') if nav_req_feature else None
         self.memory = ReplayMemory(res=(60, 108), ch_num=3, size=mem_size, 
                                    history_len=state_len-2, future_len=1, 
                                    dtypes=dtypes)
-    
-    def decide_move_nav(self, state: np.ndarray) -> torch.tensor:
-        if self.rng.uniform() < self.eps:
-            return self.rng.integers(0, self.nav_action_num)
-        else:
-            state = torch.from_numpy(state).float().cuda()
-            self.nav_net.inf_feature(state)
-            return torch.argmax(self.nav_net.inf_action()).item()
-    
-    def decide_move_no_nav(self, state: np.ndarray) -> torch.tensor:
-        if self.rng.uniform() < self.eps:
-            return self.rng.integers(0, self.action_num)
-        else:
-            state = torch.from_numpy(state).float().cuda()
-            self.act_net.inf_feature(state)
-            return torch.argmax(self.act_net.inf_action()).item()
     
     def decide_move(self, state: np.ndarray, is_combat: bool) -> torch.tensor:
         if self.rng.uniform() < self.eps:
@@ -95,19 +79,7 @@ class CombatAgent:
                 self.act_net.inf_feature(state)
                 return torch.argmax(self.act_net.inf_action()).item()
             else:
-                self.nav_net.inf_feature(state)
-                return torch.argmax(self.nav_net.inf_action()).item()
-    
-    def decide_move_blind(self, state: np.ndarray) -> torch.tensor:
-        if self.rng.uniform() < self.eps:
-            return self.rng.integers(0, self.action_num)
-        else:
-            state = torch.from_numpy(state).float().cuda()
-            if self.act_net.inf_feature(state) > 0.5:
-                return torch.argmax(self.act_net.inf_action()).item()
-            else:
-                self.nav_net.inf_feature(state)
-                return torch.argmax(self.nav_net.inf_action()).item()
+                return torch.argmax(self.nav_net(state)).item()
     
     def add_mem(self, state: np.ndarray, action: int, reward: float, features: tuple[bool]):
         self.memory.add(state, reward, action, features)
@@ -156,68 +128,8 @@ class CombatAgent:
         del current
         torch.cuda.empty_cache()
     
-    def train(self, batch_size: int=5, feature_loss_factor: float=100):
+    def train(self, batch_size: int=5, feature_loss_factor: float=10.):
         self.act_net.train()
-        indices = self.memory.replay_p(batch_size)
-        for i in indices:
-            start, end  = i-self.history_len, i+2
-            frames      = self.memory.frames[start:end, :, :, :]
-            rewards     = self.memory.rewards[start:end]
-            actions     = self.memory.actions[start:end]
-            is_combat   = self.memory.features[start:end, 0]
-            is_right_dir= self.memory.features[start:end, 1]
-            ongoing_mask= ~self.memory.features[start:end, 2]
-            
-            for s_start in range(0, self.padding_len):
-                # We are updating the state (s_end-1) here
-                # s_start to s_end-2 are the observation history
-                # s_end-1 is the current state
-                # s_end is the next state
-                s_end = s_start + self.padding_len
-                current = s_end-1
-                
-                if is_combat[current] != is_combat[s_end]:
-                    continue
-                
-                # Distinguish between combat and navigation task
-                if is_combat[current]:
-                    model   = self.act_net
-                    feature = is_combat.copy()
-                    optimizer = self.act_optimizer
-                else:
-                    model   = self.nav_net
-                    feature = is_right_dir.copy()
-                    optimizer = self.nav_optimizer
-                
-                current_action = actions[current]
-                
-                # Predict game features and action values for the next state
-                with torch.no_grad():
-                    next_state = torch.from_numpy(frames[s_start+1:s_end+1, :, :, :]).float().cuda()
-                    pred_feature = model.inf_feature(next_state)[:, 0]
-                    pred_action = torch.max(model.inf_action()[-1]).item()
-                
-                # Calculate loss for game features
-                true_feature = torch.from_numpy(feature[s_start+1:s_end+1]).float().cuda()
-                game_feature_loss = self.criterion(true_feature, pred_feature) * feature_loss_factor
-                
-                # q-target = reward + discount * max_(a')(q(s',a'))
-                q_target = torch.tensor(
-                    rewards[current] + (self.discount * pred_action) if ongoing_mask[s_end-1] else rewards[current],
-                    dtype=torch.float32, device=self.device)
-                
-                # Predict action values for the current state
-                model.inf_feature(torch.from_numpy(frames[s_start:s_end, :, :, :]).float().cuda())
-                pred_action = model.inf_action()[-1, current_action]
-                
-                # Calculate loss for action values
-                action_value_loss = self.criterion(q_target, pred_action)
-                optimizer.zero_grad()
-                (action_value_loss + game_feature_loss).backward()
-                optimizer.step()
-        self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
-    
-    def train_no_nav(self, batch_size: int=5, feature_loss_factor: float=100):
         indices = self.memory.replay_p(batch_size)
         for i in indices:
             start, end  = i-self.history_len, i+2
@@ -235,21 +147,36 @@ class CombatAgent:
                 s_end = s_start + self.padding_len
                 current = s_end-1
                 
-                model = self.act_net
-                feature = is_combat.copy()
-                optimizer = self.act_optimizer
+                is_combat_state = is_combat[current]
+                if is_combat_state and (not is_combat[s_end]):
+                    continue
                 
                 current_action = actions[current]
                 
-                # Predict game features and action values for the next state
-                with torch.no_grad():
-                    next_state = torch.from_numpy(frames[s_start+1:s_end+1, :, :, :]).float().cuda()
-                    pred_feature = model.inf_feature(next_state)[:, 0]
-                    pred_action = torch.max(model.inf_action()[-1]).item()
+                # Distinguish between combat and navigation task
+                if is_combat_state:
+                    model   = self.act_net
+                    feature = is_combat.copy()
+                    optimizer = self.act_optimizer
+                    
+                    # Predict game features and action values for the next state
+                    with torch.no_grad():
+                        next_state = torch.from_numpy(frames[s_start+1:s_end+1, :, :, :]).float().cuda()
+                        pred_feature = model.inf_feature(next_state)[:, 0]
+                        pred_action = torch.max(model.inf_action()[-1]).item()
+                    
+                    # Calculate loss for game features
+                    true_feature = torch.from_numpy(feature[s_start+1:s_end+1]).float().cuda()
+                    game_feature_loss = self.criterion(true_feature, pred_feature) * feature_loss_factor
+                    
+                else:
+                    model = self.nav_net
+                    optimizer = self.nav_optimizer
                 
-                # Calculate loss for game features
-                true_feature = torch.from_numpy(feature[s_start+1:s_end+1]).float().cuda()
-                game_feature_loss = self.criterion(true_feature, pred_feature) * feature_loss_factor
+                    # Predict game features and action values for the next state
+                    with torch.no_grad():
+                        next_state = torch.from_numpy(frames[s_end, :, :, :]).float().cuda()
+                        pred_action = torch.max(model(next_state)).item()
                 
                 # q-target = reward + discount * max_(a')(q(s',a'))
                 q_target = torch.tensor(
@@ -257,12 +184,106 @@ class CombatAgent:
                     dtype=torch.float32, device=self.device)
                 
                 # Predict action values for the current state
-                model.inf_feature(torch.from_numpy(frames[s_start:s_end, :, :, :]).float().cuda())
-                pred_action = model.inf_action()[-1, current_action]
+                if is_combat_state:
+                    model.inf_feature(torch.from_numpy(frames[s_start:s_end, :, :, :]).float().cuda())
+                    pred_action = model.inf_action()[-1, current_action]
+                else:
+                    pred_action = model(torch.from_numpy(frames[current, :, :, :]).float().cuda())
                 
                 # Calculate loss for action values
-                action_value_loss = self.criterion(q_target, pred_action)
+                loss = self.criterion(q_target, pred_action)+game_feature_loss \
+                    if is_combat_state else self.criterion(q_target, pred_action)
                 optimizer.zero_grad()
-                (action_value_loss + game_feature_loss).backward()
+                
+                loss.backward()
                 optimizer.step()
         self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
+    
+    # def train_no_nav(self, batch_size: int=5, feature_loss_factor: float=100):
+    #     indices = self.memory.replay_p(batch_size)
+    #     for i in indices:
+    #         start, end  = i-self.history_len, i+2
+    #         frames      = self.memory.frames[start:end, :, :, :]
+    #         rewards     = self.memory.rewards[start:end]
+    #         actions     = self.memory.actions[start:end]
+    #         is_combat   = self.memory.features[start:end, 0]
+    #         ongoing_mask= ~self.memory.features[start:end, 1]
+            
+    #         for s_start in range(0, self.padding_len):
+    #             # We are updating the state (s_end-1) here
+    #             # s_start to s_end-2 are the observation history
+    #             # s_end-1 is the current state
+    #             # s_end is the next state
+    #             s_end = s_start + self.padding_len
+    #             current = s_end-1
+                
+    #             model = self.act_net
+    #             feature = is_combat.copy()
+    #             optimizer = self.act_optimizer
+                
+    #             current_action = actions[current]
+                
+    #             # Predict game features and action values for the next state
+    #             with torch.no_grad():
+    #                 next_state = torch.from_numpy(frames[s_start+1:s_end+1, :, :, :]).float().cuda()
+    #                 pred_feature = model.inf_feature(next_state)[:, 0]
+    #                 pred_action = torch.max(model.inf_action()[-1]).item()
+                
+    #             # Calculate loss for game features
+    #             true_feature = torch.from_numpy(feature[s_start+1:s_end+1]).float().cuda()
+    #             game_feature_loss = self.criterion(true_feature, pred_feature) * feature_loss_factor
+                
+    #             # q-target = reward + discount * max_(a')(q(s',a'))
+    #             q_target = torch.tensor(
+    #                 rewards[current] + (self.discount * pred_action) if ongoing_mask[s_end-1] else rewards[current],
+    #                 dtype=torch.float32, device=self.device)
+                
+    #             # Predict action values for the current state
+    #             model.inf_feature(torch.from_numpy(frames[s_start:s_end, :, :, :]).float().cuda())
+    #             pred_action = model.inf_action()[-1, current_action]
+                
+    #             # Calculate loss for action values
+    #             action_value_loss = self.criterion(q_target, pred_action)
+    #             optimizer.zero_grad()
+    #             (action_value_loss + game_feature_loss).backward()
+    #             optimizer.step()
+    #     self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
+    
+    # def decide_move_nav(self, state: np.ndarray) -> torch.tensor:
+    #     if self.rng.uniform() < self.eps:
+    #         return self.rng.integers(0, self.nav_action_num)
+    #     else:
+    #         state = torch.from_numpy(state).float().cuda()
+    #         self.nav_net.inf_feature(state)
+    #         return torch.argmax(self.nav_net.inf_action()).item()
+    
+    # def decide_move_no_nav(self, state: np.ndarray) -> torch.tensor:
+    #     if self.rng.uniform() < self.eps:
+    #         return self.rng.integers(0, self.action_num)
+    #     else:
+    #         state = torch.from_numpy(state).float().cuda()
+    #         self.act_net.inf_feature(state)
+    #         return torch.argmax(self.act_net.inf_action()).item()
+    
+    # def decide_move(self, state: np.ndarray, is_combat: bool) -> torch.tensor:
+    #     if self.rng.uniform() < self.eps:
+    #         return self.rng.integers(0, self.action_num) if is_combat else self.rng.integers(0, self.nav_action_num)
+    #     else:
+    #         state = torch.from_numpy(state).float().cuda()
+    #         if is_combat:
+    #             self.act_net.inf_feature(state)
+    #             return torch.argmax(self.act_net.inf_action()).item()
+    #         else:
+    #             self.nav_net.inf_feature(state)
+    #             return torch.argmax(self.nav_net.inf_action()).item()
+    
+    # def decide_move_blind(self, state: np.ndarray) -> torch.tensor:
+    #     if self.rng.uniform() < self.eps:
+    #         return self.rng.integers(0, self.action_num)
+    #     else:
+    #         state = torch.from_numpy(state).float().cuda()
+    #         if self.act_net.inf_feature(state) > 0.5:
+    #             return torch.argmax(self.act_net.inf_action()).item()
+    #         else:
+    #             self.nav_net.inf_feature(state)
+    #             return torch.argmax(self.nav_net.inf_action()).item()

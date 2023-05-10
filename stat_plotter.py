@@ -48,10 +48,13 @@ def plot_stat(train_scores: list, all_scores:list, train_quartiles: list,
         
         kd_ratio_x = np.arange(len(all_scores[1]))
         kd_ratio = np.cumsum(all_scores[1])/(kd_ratio_x+1)
+        kd_ratio_max = kd_ratio.max()
         plt.plot(kd_ratio_x, kd_ratio)
         plt.title("Average K/D Score")
         plt.xlabel("episode")
         plt.ylabel("kill/death ratio")
+        plt.xlim(0, len(all_scores[1])+1)
+        plt.ylim(-1, kd_ratio_max+1)
         plt.savefig(f"{bot.path}/train_kill_counts.png")
         plt.clf()
         
@@ -87,7 +90,7 @@ def plot_stat(train_scores: list, all_scores:list, train_quartiles: list,
         plt.xlabel("episode")
         plt.ylabel("kill/death ratio")
         plt.xlim(0, len(all_scores[1])+1)
-        plt.ylim(-1, 7)
+        plt.ylim(-1, kd_ratio_max+1)
         
         plt.savefig(f"{bot.path}/current.png")
         plt.clf()
