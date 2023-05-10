@@ -156,6 +156,7 @@ reference/
 scenarios/
 history&backup/
 plots/
+history/
 *.wad
 *.wad.bak
 _vizdoom.ini
