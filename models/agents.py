@@ -5,7 +5,8 @@ import torch.nn.functional as F
 from numpy.random import default_rng
 import numpy as np
 
-from models.DRQN import DRQNv1
+from models.DRQN import DRQNv2
+from models.DQN import DQNv1
 from models.replay_memory import ReplayMemory
 from vizdoom_utils import *
 from time import time
@@ -15,9 +16,9 @@ model_savepath = "pretrained/nav-act-model-doom-%d.pth"
 class CombatAgent:
     def __init__(self, device: torch.device, mem_size: int, 
                  action_num: int, nav_action_num: int,
-                 discount: float, lr: float, loss=nn.MSELoss, 
+                 discount: float, lr: float, dropout, loss=nn.MSELoss, 
                  act_wd: float=0, nav_wd: float=0, optimizer=optim.SGD, 
-                 state_len: int=10, act_model=DRQNv1, nav_model=DRQNv1,
+                 state_len: int=10, act_model=DRQNv2, nav_model=DQNv1,
                  eps: float=1, eps_decay: float=0.99, eps_min: float=0.1,
                  nav_req_feature: bool=False, seed=int(time())) -> None:
         
@@ -43,13 +44,13 @@ class CombatAgent:
         
         # set up models
         self.criterion = loss()
-        self.act_net = act_model(action_num=action_num, feature_num=1).to(device)
+        self.act_net = act_model(action_num=action_num, feature_num=1, dropout=dropout).to(device)
         if nav_model == None:
             self.no_nav = True
             self.train = self.train_no_nav
         else:
             self.no_nav = False
-            self.nav_net = nav_model(action_num=nav_action_num, feature_num=1).to(device)
+            self.nav_net = nav_model(action_num=nav_action_num, dropout=dropout).to(device)
         
         # set up optimizer (a dict type lr means PPO is used)
         if type(lr) == dict:
@@ -198,6 +199,8 @@ class CombatAgent:
                 loss.backward()
                 optimizer.step()
         self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
+        
+    # Legacy code that I still want to keep as reference
     
     # def train_no_nav(self, batch_size: int=5, feature_loss_factor: float=100):
     #     indices = self.memory.replay_p(batch_size)

@@ -67,9 +67,9 @@ class DRQNv2(DQNv1):
             
         else:
             self.feature_net = nn.Sequential(
-                nn.Dropout(p=dropout)
+                nn.Dropout(p=dropout),
                 nn.Linear(6272, 1568, bias=True),
-                nn.Dropout(p=dropout)
+                nn.Dropout(p=dropout),
                 nn.Sigmoid(),
                 nn.Linear(1568, feature_num, bias=True),
                 nn.Sigmoid()
