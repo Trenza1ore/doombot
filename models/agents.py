@@ -149,7 +149,7 @@ class CombatAgent:
                 current = s_end-1
                 
                 is_combat_state = is_combat[current]
-                if is_combat_state and (not is_combat[s_end]):
+                if is_combat_state != is_combat[s_end]:
                     continue
                 
                 current_action = actions[current]

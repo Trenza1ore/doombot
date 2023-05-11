@@ -23,12 +23,12 @@ def create_game(config_path: str, color: bool = False, res: int = 240, visibilit
         case 1080:
             game.set_screen_resolution(vzd.ScreenResolution.RES_1920X1080)
         case _:
-            pass # defaults to 320x240
+            game.set_screen_resolution(vzd.ScreenResolution.RES_256X144)
     game.init()
     print("done")
     return game
 
-game = create_game(config_file_path, res=480, visibility=True)
+game = create_game(config_file_path, res=None, visibility=True)
 while True:
     game.new_episode()
     while not game.is_episode_finished():

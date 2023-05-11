@@ -21,7 +21,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 episode_to_watch: int, skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
-                downsampler=resize_cv_linear, res=(108, 60)
+                downsampler=resize_cv_linear, res=(108, 60), random_runs=False
                 ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
     all_scores = [[], []]
     train_quartiles = [[], [], [], []]
@@ -35,7 +35,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 epoch_start = load_epoch
             
             action_space_size = len(action_space)
-            enemies = {"Zombieman","shotgunGuy","MarineChainsawVzd","ChaingunGuy", "Demon","HellKnight"}
+            enemies = {"Zombieman","shotgunGuy","MarineChainsawVzd","ChaingunGuy", "Demon", "HellKnight"}
             
             print("Initial filling of replay memory with random actions")
             terminated = False
@@ -47,10 +47,11 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 frame = downsampler(state.screen_buffer, res)
                 
                 # counter-intuitively, this is actually faster than creating a list of names
+                reward = -5.
                 is_combat = False
                 for label in state.labels:
                     if label.object_name in enemies:
-                        reward = 0.
+                        reward = 5.
                         is_combat = True
                         break
                 
@@ -60,7 +61,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 
                 # game variables: [health]
                 action = randrange(0, action_space_size)
-                reward = game.make_action(action_space[action], frame_repeat)
+                reward += game.make_action(action_space[action], frame_repeat)
                 reward += (100. - health_lost) / 10.  # reward for not losing health
                 
                 agent.add_mem(frame, action, reward, (is_combat, terminated))
@@ -72,6 +73,66 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                     game.new_episode()
             
             for epoch in range(epoch_start, epoch_num):
+                
+                if random_runs:
+                    print("Filling of replay memory with random actions")
+                    terminated = False
+                    health = 100.
+                    
+                    for _ in trange(500):
+                        state = game.get_state()
+                        game_variables = state.game_variables
+                        frame = downsampler(state.screen_buffer, res)
+                        
+                        # counter-intuitively, this is actually faster than creating a list of names
+                        reward = -5.
+                        is_combat = False
+                        for label in state.labels:
+                            if label.object_name in enemies:
+                                reward = 5.
+                                is_combat = True
+                                break
+                        
+                        # calculate change in health and kill count
+                        health_lost = health - game_variables[0]
+                        health = game_variables[0]
+                        
+                        # game variables: [health]
+                        action = randrange(0, action_space_size)
+                        reward += game.make_action(action_space[action], frame_repeat)
+                        reward += (100. - health_lost) / 10.  # reward for not losing health
+                        
+                        agent.add_mem(frame, action, reward, (is_combat, terminated))
+                        
+                        terminated = game.is_episode_finished()
+                        
+                        if terminated:
+                            health = 100.
+                            game.new_episode()
+                    
+                    while not terminated:
+                        state = game.get_state()
+                        frame = downsampler(state.screen_buffer, res)
+                        game_variables = state.game_variables
+                        
+                        # counter-intuitively, this is actually faster than creating a list of names
+                        is_combat = False
+                        for label in state.labels:
+                            if label.object_name in enemies:
+                                reward = 0.
+                                is_combat = True
+                                break
+                        
+                        # calculate change in health and kill count
+                        health_lost = health - game_variables[0]
+                        health = game_variables[0]
+                        
+                        # game variables: [health, kill count]
+                        action = randrange(0, action_space_size)
+                        reward = game.make_action(action_space[action], frame_repeat)
+                        reward += (100. - health_lost) / 10.  # reward for not losing health
+                        
+                        agent.add_mem(frame, action, reward, (is_combat, terminated))
                 
                 game.new_episode()
                 train_scores = []
@@ -87,10 +148,11 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                     game_variables = state.game_variables
                     
                     # counter-intuitively, this is actually faster than creating a list of names
+                    reward = -10.
                     is_combat = False
                     for label in state.labels:
                         if label.object_name in enemies:
-                            reward = 0.
+                            reward = 10.
                             is_combat = True
                             break
                     
@@ -100,8 +162,8 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                     
                     # game variables: [health, kill count]
                     action = agent.decide_move(frame, is_combat)
-                    reward = game.make_action(action_space[action] if is_combat else nav_action_space[action], frame_repeat)
-                    reward += (100. - health_lost) / 10.  # reward for not losing health
+                    reward += game.make_action(action_space[action] if is_combat else nav_action_space[action], frame_repeat)
+                    reward -= health_lost # negative reward for losing health
                     
                     agent.add_mem(frame, action, reward, (is_combat, terminated))
                     agent.train()
@@ -163,7 +225,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 np.save(f"scores/scores_all_{epoch}.npy", np.asfarray(all_scores[0]))
                 
                 # Save models after epoch
-                agent.save_models(epoch)
+                (agent.save_models(epoch) if (epoch+1)%5==0 else None) if epoch_num > 30 else agent.save_models(epoch)
         except Exception as e:
             bot.send_error(e)
             game.close()

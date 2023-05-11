@@ -39,12 +39,12 @@ def main():
     DEVICE = check_gpu()
     n = game.get_available_buttons_size()
     act_actions = [list(a) for a in it.product([False, True], repeat=n)]
-    nav_actions = [[False]+list(a) for a in it.product([False, True], repeat=n-1)]
+    nav_actions = [[False]+list(a)+[False]*3 for a in it.product([False, True], repeat=3)]
     
     # Remove the idle action in both action space
-    # Ensure that the agent always move forward in navigation mode
+    # Ensure that the agent always turn left or right in navigation mode
     act_actions = act_actions[1:]
-    nav_actions = [action for action in nav_actions if action[1]]
+    nav_actions = [action for action in nav_actions if action[2] or action[3]]
     
     print(f"Action space: {len(act_actions)} (combat), {len(nav_actions)} (nav)")
     
@@ -58,12 +58,12 @@ def main():
     
     agent = CombatAgent(
         device=DEVICE, mem_size=100_000, action_num=len(act_actions), nav_action_num=len(nav_actions), 
-        discount=0.99, lr=0.1, dropout=0.5, loss=nn.HuberLoss, act_wd=0, nav_wd=0, optimizer=Adam, 
-        state_len=10, act_model=DRQNv2, nav_model=DQNv1, eps=1., eps_decay=0.99996, eps_min=0.1)
+        discount=0.99, lr=0.00025, dropout=0.5, loss=nn.HuberLoss, act_wd=0, nav_wd=0, optimizer=Adam, 
+        state_len=10, act_model=DRQNv2, nav_model=DQNv1, eps=1., eps_decay=0.99995, eps_min=0.1)
     
     _, _, scores = train_agent(game=game, agent=agent, action_space=act_actions, 
                                nav_action_space=nav_actions, episode_to_watch=10, skip_training=False, 
-                               plot=True, discord=True, epoch_num=100, frame_repeat=4, epoch_step=5000, 
-                               load_epoch=-1, res=(128, 72))
+                               plot=True, discord=True, epoch_num=20, frame_repeat=4, epoch_step=5000, 
+                               load_epoch=-1, res=(128, 72), random_runs=False)
 
 main()
