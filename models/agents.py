@@ -218,6 +218,10 @@ class CombatAgent:
                 s_end = s_start + self.padding_len
                 current = s_end-1
                 
+                # extra protection because numpy's choice based on probability is unreliable
+                if is_combat[current] or is_combat[s_end]:
+                    continue
+                
                 current_action = actions[current]
                 
                 model = self.nav_net
@@ -242,7 +246,6 @@ class CombatAgent:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-        self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
         
     # Legacy code that I still want to keep as reference
     

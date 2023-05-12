@@ -9,7 +9,7 @@ WEBHOOK_URL = "***REMOVED***"
 IMGBB_KEY = "***REMOVED***"
 
 class discord_bot:
-    def __init__(self, url: str = WEBHOOK_URL):
+    def __init__(self, url: str = WEBHOOK_URL, extra: str=''):
         current_time = time.strftime("%y-%m-%d-%H-%M-%S")
         self.url = url
         self.last_upload = []
@@ -17,7 +17,7 @@ class discord_bot:
         self.epoch = -1
         self.path = "history/" + current_time
         os.mkdir(self.path)
-        self.send_string("**New Run: ** " + current_time)
+        self.send_string("**New Run: ** " + current_time + " " + extra)
     
     def update_data_img(self, epoch_num: int):
         content = f"Epoch {epoch_num+1}"

@@ -146,7 +146,7 @@ class ReplayMemory:
         # Normalize before setting unpickable states to 0
         # Since negative rewards exist
         scores = scores - np.min(scores)
-        scores[self.features[0, :]] = 0
+        scores[self.features[:, 0]] = 0
         scores[:self.history_len] = 0
         scores[self.__ptr:] = 0
         scores /= np.sum(scores)
@@ -159,7 +159,7 @@ class ReplayMemory:
         # Normalize before setting unpickable states to 0
         # Since negative rewards exist
         scores = scores - np.min(scores)
-        scores[self.features[0, :]] = 0
+        scores[self.features[:, 0]] = 0
         scores[:self.history_len] = 0
         scores[self.__ptr:self.__ptr+self.history_len+1] = 0
         scores[-1] = 0

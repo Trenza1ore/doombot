@@ -19,8 +19,9 @@ from stat_plotter import plot_stat
 from training_procedure import *
 
 navigation_config = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
+combat_config4 = os.path.join(vzd.scenarios_path, "deadly_corridor_4.cfg")
 combat_config = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")
-combat_config2 = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo_4.cfg")
+combat_config2 = os.path.join(vzd.scenarios_path, "deadly_corridor.cfg")
 combat_config3 = os.path.join(vzd.scenarios_path, "deathmatch_hugo.cfg")
 
 def check_gpu() -> torch.device:
@@ -35,8 +36,9 @@ def check_gpu() -> torch.device:
     return DEVICE
             
 def main():
-    for config in [combat_config3]:
-        for lr in [0.00001, 0.00005, 0.00025]:
+    for config in [combat_config, combat_config2, combat_config4, combat_config3]:
+        lr_range = [0.000002, 0.00001, 0.00005] if "corridor" in config else [0.000025]
+        for lr in lr_range:
             DEVICE = check_gpu()
             game = create_game(config, color=True, label=True, res=(256, 144), visibility=True)
             n = game.get_available_buttons_size()
@@ -67,7 +69,7 @@ def main():
                 nav_game = create_game(navigation_config, color=True, label=True, res=(256, 144), visibility=True)
                 train_agent_corridor(game=game, agent=agent, nav_game=nav_game, action_space=act_actions,
                                 nav_action_space=nav_actions, episode_to_watch=10, skip_training=False, 
-                                plot=True, discord=True, epoch_num=15, frame_repeat=4, epoch_step=5000, 
+                                plot=True, discord=True, epoch_num=20, frame_repeat=4, epoch_step=5000, 
                                 load_epoch=-1, res=(128, 72), nav_runs=True)
             else:
                 train_agent(game=game, agent=agent, action_space=act_actions, nav_action_space=nav_actions, 
