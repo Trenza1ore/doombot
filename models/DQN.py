@@ -78,7 +78,7 @@ class DRQNv1(nn.Module):
         )
         
         self.decision_net = nn.Sequential(
-            nn.LSTM(input_size=4608, hidden_size=action_num, bias=True, dropout=dropout)
+            nn.LSTM(input_size=4608, hidden_size=action_num, bias=True)
         )
         
         self.feature_net = nn.Sequential(

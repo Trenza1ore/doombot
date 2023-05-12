@@ -187,13 +187,57 @@ class CombatAgent:
                 # Predict action values for the current state
                 if is_combat_state:
                     model.inf_feature(torch.from_numpy(frames[s_start:s_end, :, :, :]).float().cuda())
-                    pred_action = torch.max(model.inf_action()[-1, current_action])
+                    pred_action = model.inf_action()[-1, current_action]
                 else:
-                    pred_action = torch.max(model(torch.from_numpy(frames[current, :, :, :]).float().cuda()))
+                    pred_action = model(torch.from_numpy(frames[current, :, :, :]).float().cuda())[0, current_action]
                 
                 # Calculate loss for action values
                 loss = self.criterion(q_target, pred_action)+game_feature_loss \
                     if is_combat_state else self.criterion(q_target, pred_action)
+                
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+        self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
+    
+    def nav_train(self, batch_size: int=5, feature_loss_factor: float=10.):
+        indices = self.memory.replay_p_nav(batch_size)
+        for i in indices:
+            start, end  = i-self.history_len, i+2
+            frames      = self.memory.frames[start:end, :, :, :]
+            rewards     = self.memory.rewards[start:end]
+            actions     = self.memory.actions[start:end]
+            is_combat   = self.memory.features[start:end, 0]
+            ongoing_mask= ~self.memory.features[start:end, 1]
+            
+            for s_start in range(0, self.padding_len):
+                # We are updating the state (s_end-1) here
+                # s_start to s_end-2 are the observation history
+                # s_end-1 is the current state
+                # s_end is the next state
+                s_end = s_start + self.padding_len
+                current = s_end-1
+                
+                current_action = actions[current]
+                
+                model = self.nav_net
+                optimizer = self.nav_optimizer
+            
+                # Predict game features and action values for the next state
+                with torch.no_grad():
+                    next_state = torch.from_numpy(frames[s_end, :, :, :]).float().cuda()
+                    pred_action = torch.max(model(next_state)).item()
+                
+                # q-target = reward + discount * max_(a')(q(s',a'))
+                q_target = torch.tensor(
+                    rewards[current] + (self.discount * pred_action) if ongoing_mask[s_end-1] else rewards[current],
+                    dtype=torch.float32, device=self.device)
+                
+                # Predict action values for the current state
+                pred_action = model(torch.from_numpy(frames[current, :, :, :]).float().cuda())[0, current_action]
+                
+                # Calculate loss for action values
+                loss = self.criterion(q_target, pred_action)
                 
                 optimizer.zero_grad()
                 loss.backward()

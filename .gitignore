@@ -164,3 +164,4 @@ _vizdoom.ini
 *.pth
 *.ipynb
 test.py
+*.zip

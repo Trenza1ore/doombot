@@ -2,7 +2,7 @@ import numpy as np
 from numpy.random import choice, randint, default_rng, multinomial
 
 class ReplayMemory:
-    def __init__(self, res: tuple[int, int]=(240, 320), ch_num: int=3, size: int=40000, 
+    def __init__(self, res: tuple[int, int]=(240, 320), ch_num: int=3, size: int=40000, nav: bool=True,
                  history_len: int=6, future_len: int=1, dtypes: list[object]=[np.uint8, np.float32]):
         """A class that implements replay memory for experience replay and prioritized experience replay.
 
@@ -34,7 +34,7 @@ class ReplayMemory:
             self.feature_num = 0
         
         # No navigation model
-        if self.feature_num == 2:
+        if not nav:
             self.replay_p = self.replay_p_no_check
             self.replay_p_filled = self.replay_p_filled_no_check
             
@@ -70,6 +70,7 @@ class ReplayMemory:
             self.__ptr = 0
             self.add = self.add_filled
             self.replay_p = self.replay_p_filled
+            self.replay_p_nav = self.replay_p_nav_filled
         self.frames[self.__ptr, :, :, :] = frame
         self.rewards[self.__ptr] = reward
         self.actions[self.__ptr] = action
@@ -84,8 +85,8 @@ class ReplayMemory:
         self.features[self.__ptr, :] = features
 
     # First pass version
-    def replay_p(self, n: int, r: bool=True, scores=None) -> np.ndarray[np.unsignedinteger]:
-        if scores == None:
+    def replay_p(self, n: int, r: bool=True, scores=0) -> np.ndarray[np.unsignedinteger]:
+        if scores is 0: # if scores == None won't work with numpy arrays...
             scores = np.asfarray(self.rewards)
             # Normalize before setting unpickable states to 0
             # Since negative rewards exist
@@ -99,8 +100,8 @@ class ReplayMemory:
         return indices
     
     # After memory's filled
-    def replay_p_filled(self, n: int, r: bool=True, scores=None) -> np.ndarray[np.unsignedinteger]:
-        if scores == None:
+    def replay_p_filled(self, n: int, r: bool=True, scores=0) -> np.ndarray[np.unsignedinteger]:
+        if scores is 0: # if scores == None won't work with numpy arrays...
             scores = np.asfarray(self.rewards)
             # Normalize before setting unpickable states to 0
             # Since negative rewards exist
@@ -132,6 +133,33 @@ class ReplayMemory:
         # Normalize before setting unpickable states to 0
         # Since negative rewards exist
         scores = scores - np.min(scores)
+        scores[:self.history_len] = 0
+        scores[self.__ptr:self.__ptr+self.history_len+1] = 0
+        scores[-1] = 0
+        scores /= np.sum(scores)
+        indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
+        return indices
+    
+    # First pass version
+    def replay_p_nav(self, n: int, r: bool=True) -> np.ndarray[np.unsignedinteger]:
+        scores = np.asfarray(self.rewards)
+        # Normalize before setting unpickable states to 0
+        # Since negative rewards exist
+        scores = scores - np.min(scores)
+        scores[self.features[0, :]] = 0
+        scores[:self.history_len] = 0
+        scores[self.__ptr:] = 0
+        scores /= np.sum(scores)
+        indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
+        return indices
+    
+    # After memory's filled
+    def replay_p_nav_filled(self, n: int, r: bool=True) -> np.ndarray[np.unsignedinteger]:
+        scores = np.asfarray(self.rewards)
+        # Normalize before setting unpickable states to 0
+        # Since negative rewards exist
+        scores = scores - np.min(scores)
+        scores[self.features[0, :]] = 0
         scores[:self.history_len] = 0
         scores[self.__ptr:self.__ptr+self.history_len+1] = 0
         scores[-1] = 0
