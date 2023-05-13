@@ -21,8 +21,8 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 episode_to_watch: int, skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
-                downsampler=resize_cv_linear, res=(108, 60), random_runs=False
-                ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+                downsampler=resize_cv_linear, res=(108, 60), random_runs=False,
+                ep_max=100) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
     all_scores = [[], []]
     train_quartiles = [[], [], [], []]
     if (not skip_training):
@@ -240,7 +240,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 # Save models after epoch
                 #(agent.save_models(epoch) if not (epoch+1)%5 else None) if epoch_num > 30 else agent.save_models(epoch)
                 
-                if len(all_scores[0]) > 100:
+                if len(all_scores[0]) > ep_max:
                     return
                 
                 sleep(60) # pause for a minute to recover from heat
@@ -257,8 +257,8 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                 episode_to_watch: int, skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
-                downsampler=resize_cv_linear, res=(108, 60), nav_runs=False
-                ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+                downsampler=resize_cv_linear, res=(108, 60), nav_runs=False,
+                ep_max=1000) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
     all_scores = [[], []]
     train_quartiles = [[], [], [], []]
     if (not skip_training):
@@ -476,7 +476,7 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                 # Save models after epoch
                 #(agent.save_models(epoch) if not (epoch+1)%5 else None) if epoch_num > 30 else agent.save_models(epoch)
                 
-                if len(all_scores[0]) > 1000:
+                if len(all_scores[0]) > ep_max:
                     return
                 
                 sleep(45) # pause for 45 seconds to recover from heat
