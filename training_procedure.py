@@ -238,11 +238,6 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                     bot.send_string(stats+'\n'+timer)
                     bot.send_img(epoch)
                 
-                np.save("scores/train_quartiles.npy", np.asfarray(train_quartiles))
-                np.save("scores/train_kill_counts.npy", np.asfarray(all_scores[1]))
-                np.save(f"scores/scores_{epoch}.npy", train_scores)
-                np.save(f"scores/scores_all_{epoch}.npy", np.asfarray(all_scores[0]))
-                
                 # Save models after epoch
                 agent.save_models(epoch) if not (epoch+1)%save_interval else None
                 
@@ -484,11 +479,6 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                     bot.send_string(stats+'\n'+timer)
                     bot.send_img(epoch)
                 
-                np.save("scores/train_quartiles.npy", np.asfarray(train_quartiles))
-                np.save("scores/train_kill_counts.npy", np.asfarray(all_scores[1]))
-                np.save(f"scores/scores_{epoch}.npy", train_scores)
-                np.save(f"scores/scores_all_{epoch}.npy", np.asfarray(all_scores[0]))
-                
                 # Save models after epoch
                 agent.save_models(epoch) if not (epoch+1)%save_interval else None
                 
@@ -499,7 +489,6 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                     nav_game.close()
                     game.close()
                     return
-                
                 
                 sleep(45) # pause for 45 seconds to recover from heat
         except Exception as e:

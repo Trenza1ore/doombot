@@ -31,16 +31,17 @@ def check_gpu() -> torch.device:
             
 def main():
     
-    save_validation = False
+    save_validation = True # don't validate saving 
     
     # ep_max (maximum training episode) would overwrite the epoch_num (number of epochs) setting
     
     for config, lr, ep_max, save_interval, name in [
-        (corridor_og_4, 0.000002, 1000, 5, "dc4_0"),
-        (corridor_og_5, 0.000002, 1000, 5, "dc5_0"),
-        (corridor_og_4, 0.00001, 1000, 5, "dc4_1"),
-        (corridor_mod_5, 0.000002, 10000, 15, "dcm_0"),
-        (deathmatch_mod_5, 0.000002, 1000, 15, "dm5_0"),
+        (corridor_og_4, 0.000002, 1000, 0, "dc4_0"),
+        (corridor_og_4, 0.00001, 1000, 0, "dc4_1"),
+        (corridor_og_5, 0.00001, 1000, 0, "dc5_1"),
+        (corridor_mod_5, 0.000002, 10000, 20, "dcm_0"),
+        (deathmatch_mod_5, 0.00001, 1000, 20, "dm5_1"),
+        (deathmatch_mod_5, 0.000002, 1000, 20, "dm5_0"),
         ]:
         
         DEVICE = check_gpu()
