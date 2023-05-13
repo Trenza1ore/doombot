@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from models import CombatAgent
-from discord_webhook import discord_bot
+from stats.discord_webhook import discord_bot
 
 def plot_stat(train_scores: list, all_scores:list, train_quartiles: list, 
               epoch: int, agent: CombatAgent, bot: discord_bot, epoch_start: int=0, plot: bool=True) -> str:

@@ -1,21 +1,15 @@
 # Imports
 import itertools as it
 import os
-import numpy as np
 import torch
 import torch.nn as nn
 import vizdoom as vzd
 
-from time import sleep, time
-from tqdm import trange
-from random import randrange
+from time import sleep
 from torch.optim import SGD, Adam, Adagrad
-from torch_pso import ChaoticPSO, ParticleSwarmOptimizer as PSO
 
 from models import *
-from discord_webhook import discord_bot
 from vizdoom_utils import *
-from stat_plotter import plot_stat
 from training_procedure import *
 
 empty_corridor = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
@@ -36,11 +30,12 @@ def check_gpu() -> torch.device:
     return DEVICE
             
 def main():
-    for config, lr, ep_max in [
-        (deathmatch_mod_5, 0.000002, 100),
-        (corridor_og_4, 0.000002, 1000),
-        (corridor_og_4, 0.00001, 1000),
-        (corridor_mod_5, 0.000002, 10000),
+    for config, lr, ep_max, save_interval, name in [
+        (corridor_og_4, 0.000002, 1000, 5, "dc4_0"),
+        (corridor_og_5, 0.000002, 1000, 5, "dc5_0"),
+        (corridor_og_4, 0.00001, 1000, 5, "dc4_1"),
+        (corridor_mod_5, 0.000002, 10000, 10, "dcm_0"),
+        (deathmatch_mod_5, 0.000002, 1000, 10, "dm5_0"),
         ]:
         
         DEVICE = check_gpu()
@@ -56,30 +51,22 @@ def main():
         
         print(f"Action space: {len(act_actions)} (combat), {len(nav_actions)} (nav)")
         
-        # Not using PSO, too slow
-        pso_config = {
-            "inertial_weight"   : 0.5,
-            "num_particles"     : 100,
-            "max_param_value"   : 500,
-            "min_param_value"   : -500
-        }
-        
         agent = CombatAgent(
             device=DEVICE, mem_size=250_000, action_num=len(act_actions), nav_action_num=len(nav_actions), 
             discount=0.99, lr=lr, dropout=0.5, loss=nn.HuberLoss, act_wd=0, nav_wd=0, optimizer=Adam, 
-            state_len=10, act_model=DRQNv2, nav_model=DQNv1, eps=1., eps_decay=0.99995, eps_min=0.1)
+            state_len=10, act_model=DRQNv2, nav_model=DQNv1, eps=1., eps_decay=0.99995, name=name)
         
         if "corridor" in config:
             nav_game = create_game(empty_corridor, color=True, label=True, res=(256, 144), visibility=True)
             train_agent_corridor(game=game, agent=agent, nav_game=nav_game, action_space=act_actions,
-                            nav_action_space=nav_actions, episode_to_watch=10, skip_training=False, 
-                            plot=True, discord=True, epoch_num=20, frame_repeat=4, epoch_step=5000, 
-                            load_epoch=-1, res=(128, 72), nav_runs=True, ep_max=ep_max)
+                            nav_action_space=nav_actions, skip_training=False, plot=True, discord=True, 
+                            epoch_num=20, frame_repeat=4, epoch_step=5000, load_epoch=-1, res=(128, 72), 
+                            nav_runs=True, ep_max=ep_max, save_interval=save_interval)
         else:
             train_agent(game=game, agent=agent, action_space=act_actions, nav_action_space=nav_actions, 
-                        episode_to_watch=10, skip_training=False, plot=True, discord=True, epoch_num=18, 
-                        frame_repeat=4, epoch_step=5000, load_epoch=-1, res=(128, 72), random_runs=False, 
-                        ep_max=ep_max)
+                        skip_training=False, plot=True, discord=True, epoch_num=18, frame_repeat=4, 
+                        epoch_step=5000, load_epoch=-1, res=(128, 72), random_runs=False, ep_max=ep_max, 
+                        save_interval=save_interval)
 
         sleep(300) # pause for 5 minutes to recover from heat
 

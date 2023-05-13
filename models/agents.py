@@ -10,7 +10,7 @@ from models.replay_memory import ReplayMemory
 from vizdoom_utils import *
 from time import time
 
-model_savepath = "pretrained/nav-act-model-doom-%d.pth"
+model_savepath = "pretrained/%s-model-doom-%d.pth"
 
 class CombatAgent:
     def __init__(self, device: torch.device, mem_size: int, 
@@ -19,7 +19,7 @@ class CombatAgent:
                  act_wd: float=0, nav_wd: float=0, optimizer=optim.SGD, 
                  state_len: int=10, act_model=DRQNv2, nav_model=DQNv1,
                  eps: float=1, eps_decay: float=0.99, eps_min: float=0.1,
-                 nav_req_feature: bool=False, seed=int(time())) -> None:
+                 nav_req_feature: bool=False, name: str='', seed=int(time())):
         
         # store model hyper parameters
         self.device = device
@@ -33,13 +33,13 @@ class CombatAgent:
         self.eps = eps
         self.eps_decay = eps_decay
         self.eps_min = eps_min
+        self.name = name
         
         # set up random number generator
         self.rng = default_rng(seed)
         
         self.history_len = state_len - 2
         self.padding_len = state_len >> 1
-        self.current_idx = self.history_len
         
         # set up models
         self.criterion = loss()
@@ -98,35 +98,38 @@ class CombatAgent:
         current = dict()
         current["memory"] = self.memory
         current["stat_dict_act"] = self.act_net.state_dict()
+        current["stat_dict_opt_act"] = self.act_optimizer.state_dict()
         if not self.no_nav:
             current["stat_dict_nav"] = self.nav_net.state_dict()
-        current["hyper_param"] = (self.action_num, self.memory.max_size, 
+            current["stat_dict_opt_nav"] = self.nav_optimizer.state_dict()
+        current["hyper_param"] = (self.action_num, self.nav_action_num, 
+                                  self.history_len, self.padding_len,
                                   self.discount, self.act_wd, self.nav_wd,
                                   self.eps, self.eps_decay, self.eps_min)
-        torch.save(current, model_savepath %(epoch))
+        torch.save(current, model_savepath %(self.name, epoch))
         del current
         
-    def load_models(self, epoch: int, inference: bool=True):
-        current = torch.load(model_savepath %(epoch))
+    def load_models(self, epoch: int, name: str='', inference: bool=True):
+        self.name = name
+        current = torch.load(model_savepath %(name, epoch))
         self.act_net.load_state_dict(current["stat_dict_act"])
         if not self.no_nav:
             self.nav_net.load_state_dict(current["stat_dict_nav"])
-        self.action_num, self.memory.max_size, self.discount, self.act_wd, \
-            self.nav_wd,self.eps, self.eps_decay, self.eps_min = current["hyper_param"]
+        self.action_num, self.nav_action_num, self.history_len, self.padding_len, \
+            self.discount, self.act_wd, self.nav_wd, self.eps, self.eps_decay, \
+            self.eps_min = current["hyper_param"]
             
         if not inference:
-            self.act_optimizer = self.optimizer(self.act_net.parameters(), 
-                                                lr=self.lr, weight_decay=self.act_wd)
+            self.act_optimizer.load_state_dict(current["stat_dict_opt_act"])
             if not self.no_nav:
-                self.nav_optimizer = self.optimizer(self.nav_net.parameters(), 
-                                                lr=self.lr, weight_decay=self.nav_wd)
+                self.nav_optimizer.load_state_dict(current["stat_dict_opt_nav"])
             self.memory = current["memory"]
-            self.rng = default_rng()
         else:
             self.act_net.eval()
             if not self.no_nav:
                 self.nav_net.eval()
         
+        # Avoid CUDA out of memory error when model memory allocation is close to 100% vram
         del current
         torch.cuda.empty_cache()
     

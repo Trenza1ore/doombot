@@ -12,21 +12,24 @@ from torch.optim import SGD, Adam, Adagrad
 from torch_pso import ChaoticPSO, ParticleSwarmOptimizer as PSO
 
 from models import *
-from discord_webhook import discord_bot
+from stats import *
 from vizdoom_utils import *
-from stat_plotter import plot_stat
 
 def train_agent(game: vzd.vizdoom.DoomGame, 
                 agent: CombatAgent, action_space: list, nav_action_space: list, 
-                episode_to_watch: int, skip_training: bool=False, 
+                skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
                 downsampler=resize_cv_linear, res=(108, 60), random_runs=False,
-                ep_max=100) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+                ep_max=1000, save_interval=0
+                ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+    if save_interval == 0:
+        save_interval = epoch_num+1
+        
     all_scores = [[], []]
     train_quartiles = [[], [], [], []]
     if (not skip_training):
-        bot = discord_bot(extra=f"deathmatch lr={agent.lr:.8f}")
+        bot = discord_bot(extra=f"deathmatch '{agent.name}' lr={agent.lr:.8f}")
         try:
             start = time()
             if load_epoch < 0:
@@ -238,7 +241,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 np.save(f"scores/scores_all_{epoch}.npy", np.asfarray(all_scores[0]))
                 
                 # Save models after epoch
-                #(agent.save_models(epoch) if not (epoch+1)%5 else None) if epoch_num > 30 else agent.save_models(epoch)
+                agent.save_models(epoch) if not (epoch+1)%save_interval else None
                 
                 if len(all_scores[0]) > ep_max:
                     return
@@ -254,15 +257,19 @@ def train_agent(game: vzd.vizdoom.DoomGame,
 
 def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomGame,
                 agent: CombatAgent, action_space: list, nav_action_space: list, 
-                episode_to_watch: int, skip_training: bool=False, 
+                skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
                 downsampler=resize_cv_linear, res=(108, 60), nav_runs=False,
-                ep_max=1000) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+                ep_max=1000, save_interval=0
+                ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+    if save_interval == 0:
+        save_interval = epoch_num+1
+    
     all_scores = [[], []]
     train_quartiles = [[], [], [], []]
     if (not skip_training):
-        bot = discord_bot(extra=f"deadly corridor lr={agent.lr:.8f}")
+        bot = discord_bot(extra=f"deadly corridor '{agent.name}' lr={agent.lr:.8f}")
         try:
             start = time()
             if load_epoch < 0:
@@ -474,7 +481,7 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                 np.save(f"scores/scores_all_{epoch}.npy", np.asfarray(all_scores[0]))
                 
                 # Save models after epoch
-                #(agent.save_models(epoch) if not (epoch+1)%5 else None) if epoch_num > 30 else agent.save_models(epoch)
+                agent.save_models(epoch) if not (epoch+1)%save_interval else None
                 
                 if len(all_scores[0]) > ep_max:
                     return

@@ -3,7 +3,6 @@ import requests
 import traceback
 import os
 import time
-import matplotlib.pyplot as plt
 
 WEBHOOK_URL = "***REMOVED***"
 IMGBB_KEY = "***REMOVED***"
@@ -17,6 +16,8 @@ class discord_bot:
         self.epoch = -1
         self.path = "history/" + current_time
         os.mkdir(self.path)
+        with open(self.path+'/'+extra, 'w') as f:
+            f.write(current_time)
         self.send_string("**New Run: ** " + current_time + " " + extra)
     
     def update_data_img(self, epoch_num: int):
