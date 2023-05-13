@@ -9,7 +9,7 @@ from time import sleep, time
 from tqdm import trange
 from random import randrange
 from torch.optim import SGD, Adam, Adagrad
-from torch_pso import ChaoticPSO, ParticleSwarmOptimizer as PSO
+from capture_footage import capture
 
 from models import *
 from stats import *
@@ -20,7 +20,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
-                downsampler=resize_cv_linear, res=(108, 60), random_runs=False,
+                downsampler=resize_cv_linear, res=(128, 72), random_runs=False,
                 ep_max=1000, save_interval=0
                 ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
     if save_interval == 0:
@@ -44,6 +44,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
             print("Initial filling of replay memory with random actions")
             terminated = False
             health = 100.
+            game.new_episode()
             
             for _ in trange(500):
                 state = game.get_state()
@@ -149,6 +150,8 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                         reward -= health_lost # negative reward for losing health
                         
                         agent.add_mem(frame, action, reward, (is_combat, terminated))
+                        
+                        terminated = game.is_episode_finished()
                 
                 game.new_episode()
                 train_scores = []
@@ -244,6 +247,10 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 agent.save_models(epoch) if not (epoch+1)%save_interval else None
                 
                 if len(all_scores[0]) > ep_max:
+                    agent.save_models(epoch) if (epoch+1)%save_interval else None
+                    bot.send_string("Training Complete!")
+                    capture(agent, game, frame_repeat, action_space, nav_action_space, downsampler, res, 10)
+                    game.close()
                     return
                 
                 sleep(60) # pause for a minute to recover from heat
@@ -251,7 +258,8 @@ def train_agent(game: vzd.vizdoom.DoomGame,
             bot.send_error(e)
             game.close()
             return
-            
+    
+    bot.send_string("Training Complete!")        
     game.close()
     return (agent, game, all_scores)
 
@@ -260,7 +268,7 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                 skip_training: bool=False, 
                 plot: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
-                downsampler=resize_cv_linear, res=(108, 60), nav_runs=False,
+                downsampler=resize_cv_linear, res=(128, 72), nav_runs=False,
                 ep_max=1000, save_interval=0
                 ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
     if save_interval == 0:
@@ -332,8 +340,10 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
             
             for epoch in range(epoch_start, epoch_num):
                 
+                print(f"\n==========Epoch {epoch+1:3d}==========")
+                
                 if nav_runs:
-                    print("Nav run")
+                    print("\nNav run")
                     terminated = False
                     nav_game.new_episode()
                     
@@ -378,7 +388,6 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                 
                 train_scores = []
                 train_kills = []
-                print(f"\n==========Epoch {epoch+1:3d}==========")
                 
                 game.new_episode()
                 terminated = False
@@ -484,7 +493,13 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                 agent.save_models(epoch) if not (epoch+1)%save_interval else None
                 
                 if len(all_scores[0]) > ep_max:
+                    agent.save_models(epoch) if (epoch+1)%save_interval else None
+                    bot.send_string("Training Complete!")
+                    capture(agent, game, frame_repeat, action_space, nav_action_space, downsampler, res, 10)
+                    nav_game.close()
+                    game.close()
                     return
+                
                 
                 sleep(45) # pause for 45 seconds to recover from heat
         except Exception as e:

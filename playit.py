@@ -1,39 +1,30 @@
 import vizdoom as vzd
 import os
+from matplotlib.image import imsave
+from vizdoom_utils import resize_cv_linear, create_game
 
-#config_file_path = os.path.join(vzd.scenarios_path, "deathmatch_hugo.cfg")
-config_file_path = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
+is_recording = True
+res=(256, 144)
+#res=(1920, 1080)
+#config_file_path = os.path.join(vzd.scenarios_path, "deathmatch.cfg")
+config_file_path = os.path.join(vzd.scenarios_path, "deathmatch_hugo.cfg")
 #config_file_path = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")
 
-def create_game(config_path: str, color: bool = False, res: int = 240, visibility: bool = False) -> vzd.vizdoom.DoomGame:
-    print("Initializing Doom... ", end='')
-    game = vzd.DoomGame()
-    game.load_config(config_path)
-    game.set_window_visible(visibility)
-    game.set_mode(vzd.Mode.ASYNC_SPECTATOR)
-    game.set_depth_buffer_enabled(True)
-    game.set_labels_buffer_enabled(True)
-    game.set_render_hud(True)
-    game.set_doom_skill(1)
-    if not color:
-        game.set_screen_format(vzd.ScreenFormat.GRAY8)
-    match res:
-        case 480:
-            game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-        case 1080:
-            game.set_screen_resolution(vzd.ScreenResolution.RES_1920X1080)
-        case _:
-            game.set_screen_resolution(vzd.ScreenResolution.RES_256X144)
-    game.init()
-    print("done")
-    return game
 
-game = create_game(config_file_path, res=None, visibility=True)
+if is_recording:
+    if not os.path.isdir("screenshots"):
+        os.mkdir("screenshots")
+game = create_game(config_file_path, color=True, depth=False, res=res, visibility=True, asyn=True, spec=True)
+
 while True:
     game.new_episode()
+    i = 0
     while not game.is_episode_finished():
+        i += 1
         state = game.get_state()
-        for label in state.labels:
-            if label.object_name in ("Zombieman", "ShotgunGuy", "ChaingunGuy"):
-                print('enemy')
+        if is_recording:
+            frame = state.screen_buffer
+            frame_lr = resize_cv_linear(frame, (128, 72))
+            imsave(f"screenshots/{i}.png", frame.transpose(1,2,0))
+            imsave(f"screenshots/low_res_{i}.png", frame_lr.transpose(1,2,0))
         game.advance_action()

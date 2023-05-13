@@ -16,7 +16,7 @@ def create_game(config_path: str, color: bool=False, depth: bool=True, label: bo
     game.load_config(config_path)
     
     # set game to sync/async player mode or async spectator mode
-    game.set_mode(vzd.Mode.PLAYER) if "async" not in kwargs else \
+    game.set_mode(vzd.Mode.PLAYER) if "asyn" not in kwargs else \
         (game.set_mode(vzd.Mode.ASYNC_PLAYER) if "spec" not in kwargs else \
             game.set_mode(vzd.Mode.ASYNC_SPECTATOR))
     

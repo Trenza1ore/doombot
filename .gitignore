@@ -157,8 +157,8 @@ scenarios/
 history&backup/
 plots/
 history/
-*.wad
-*.wad.bak
+doom.wad
+doom.wad.bak
 _vizdoom.ini
 *.npy
 *.pth

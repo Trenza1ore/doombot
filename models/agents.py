@@ -73,15 +73,30 @@ class CombatAgent:
                                    dtypes=dtypes)
     
     def decide_move(self, state: np.ndarray, is_combat: bool) -> torch.tensor:
+        state = torch.from_numpy(state).float().cuda()
         if self.rng.uniform() < self.eps:
             return self.rng.integers(0, self.action_num) if is_combat else self.rng.integers(0, self.nav_action_num)
         else:
-            state = torch.from_numpy(state).float().cuda()
             if is_combat:
                 self.act_net.inf_feature(state)
                 return torch.argmax(self.act_net.inf_action()).item()
             else:
                 return torch.argmax(self.nav_net(state)).item()
+
+    def decide_move_blind(self, state: np.ndarray) -> tuple[torch.tensor, bool]:
+        state = torch.from_numpy(state).float().cuda()
+        if self.act_net.inf_feature(state) > 0.5:
+            return (torch.argmax(self.act_net.inf_action()).item(), True)
+        else:
+            return (torch.argmax(self.nav_net(state)).item(), False)
+    
+    def eval(self, mode: bool=True):
+        if mode:
+            self.act_net.eval()
+            self.nav_net.eval()
+        else:
+            self.act_net.train()
+            self.nav_net.train()
     
     def add_mem(self, state: np.ndarray, action: int, reward: float, features: tuple[bool]):
         self.memory.add(state, reward, action, features)
@@ -94,7 +109,7 @@ class CombatAgent:
                             features: np.ndarray[bool]):
         self.memory.bulk_add(state, reward, action, features)
     
-    def save_models(self, epoch: int):
+    def save_models(self, epoch: int) -> str:
         current = dict()
         current["memory"] = self.memory
         current["stat_dict_act"] = self.act_net.state_dict()
@@ -106,8 +121,12 @@ class CombatAgent:
                                   self.history_len, self.padding_len,
                                   self.discount, self.act_wd, self.nav_wd,
                                   self.eps, self.eps_decay, self.eps_min)
-        torch.save(current, model_savepath %(self.name, epoch))
+        file_name = model_savepath %(self.name, epoch)
+        torch.save(current, file_name, pickle_protocol=5)
+        
         del current
+        
+        return file_name
         
     def load_models(self, epoch: int, name: str='', inference: bool=True):
         self.name = name
@@ -330,13 +349,3 @@ class CombatAgent:
     #             self.nav_net.inf_feature(state)
     #             return torch.argmax(self.nav_net.inf_action()).item()
     
-    # def decide_move_blind(self, state: np.ndarray) -> torch.tensor:
-    #     if self.rng.uniform() < self.eps:
-    #         return self.rng.integers(0, self.action_num)
-    #     else:
-    #         state = torch.from_numpy(state).float().cuda()
-    #         if self.act_net.inf_feature(state) > 0.5:
-    #             return torch.argmax(self.act_net.inf_action()).item()
-    #         else:
-    #             self.nav_net.inf_feature(state)
-    #             return torch.argmax(self.nav_net.inf_action()).item()

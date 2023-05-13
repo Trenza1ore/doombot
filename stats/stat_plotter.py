@@ -33,7 +33,7 @@ def plot_stat(train_scores: list, all_scores:list, train_quartiles: list,
         plt.savefig(f"{bot.path}/{epoch}a.png")
         plt.clf()
         
-        episode_x = np.arange(len(all_scores[1]))
+        episode_x = np.arange(len(all_scores[0]))
         
         plt.plot(episode_x, np.cumsum(all_scores[0])/episode_x+1, 'k-', label="Mean")
         plt.xlabel("episode")
@@ -88,10 +88,8 @@ def plot_stat(train_scores: list, all_scores:list, train_quartiles: list,
         plt.savefig(f"{bot.path}/current.png")
         plt.clf()
     
-    np.save(f"{bot.path}/train_quartiles.npy", np.asfarray(train_quartiles))
     np.save(f"{bot.path}/train_kill_counts.npy", np.asfarray(all_scores[1]))
     np.save(f"{bot.path}/scores_{epoch}.npy", train_scores)
-    np.save(f"{bot.path}/scores_all_{epoch}.npy", np.asfarray(all_scores[0]))
     
     stats = f"Result:\nmean: {mean:.2f} +- {train_scores.std():.2f}\nQ1: {Q1}\nQ2: {Q2}\nQ3: {Q3}\nmin: {train_scores.min():.2f}\nmax: {train_scores.max():.2f}"
     print(stats)
