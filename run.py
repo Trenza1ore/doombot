@@ -12,11 +12,16 @@ from models import *
 from vizdoom_utils import *
 from training_procedure import *
 
-empty_corridor = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")
-corridor_og_4 = os.path.join(vzd.scenarios_path, "deadly_corridor_4.cfg")
-corridor_mod_5 = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")
-corridor_og_5 = os.path.join(vzd.scenarios_path, "deadly_corridor.cfg")
-deathmatch_mod_5 = os.path.join(vzd.scenarios_path, "deathmatch_hugo.cfg")
+# Deadly Corridor Scenarios
+empty_corridor = os.path.join(vzd.scenarios_path, "empty_corridor.cfg")         # no enemy, starts with pistol
+empty_corridor_mod = os.path.join(vzd.scenarios_path, "empty_corridor_hugo.cfg")# no enemy, starts with shotgun
+corridor_og_4 = os.path.join(vzd.scenarios_path, "deadly_corridor_4.cfg")       # difficulty 4, starts with pistol
+corridor_mod_5 = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")   # difficulty 5, starts with pistol
+corridor_og_5 = os.path.join(vzd.scenarios_path, "deadly_corridor.cfg")         # difficulty 5, starts with shotgun
+
+# Deathmatch Scenarios
+deathmatch_mod_5 = os.path.join(vzd.scenarios_path, "deathmatch_hugo.cfg")      # my version
+deathmatch_og_5 = os.path.join(vzd.scenarios_path, "deathmatch_og_texture.cfg") # with original texture
 
 def check_gpu() -> torch.device:
     # Uses GPU if available
@@ -36,12 +41,14 @@ def main():
     # ep_max (maximum training episode) would overwrite the epoch_num (number of epochs) setting
     
     for config, lr, ep_max, save_interval, name in [
-        (corridor_og_4, 0.000002, 1000, 0, "dc4_0"),
-        (corridor_og_4, 0.00001, 1000, 0, "dc4_1"),
+        #(corridor_og_4, 0.000002, 1000, 0, "dc4_0"),
+        #(corridor_og_4, 0.00001, 1000, 0, "dc4_1"),
+        (deathmatch_og_5, 0.00001, 100, 0, "dm5_og_1"),
+        (deathmatch_og_5, 0.000002, 100, 0, "dm5_og_2"),
         (corridor_og_5, 0.00001, 1000, 0, "dc5_1"),
-        (corridor_mod_5, 0.000002, 10000, 20, "dcm_0"),
-        (deathmatch_mod_5, 0.00001, 1000, 20, "dm5_1"),
-        (deathmatch_mod_5, 0.000002, 1000, 20, "dm5_0"),
+        (corridor_mod_5, 0.000002, 10000, 30, "dcm_0"),
+        (deathmatch_mod_5, 0.00001, 1000, 30, "dm5_1"),
+        (deathmatch_mod_5, 0.000002, 1000, 30, "dm5_0")
         ]:
         
         DEVICE = check_gpu()
@@ -64,7 +71,8 @@ def main():
             state_len=10, act_model=DRQNv2, nav_model=DQNv1, eps=1., eps_decay=0.99995, name=name)
         
         if is_corridor:
-            nav_game = create_game(empty_corridor, color=True, label=True, res=(256, 144), visibility=True)
+            empty_config = empty_corridor_mod if "hugo" in config else empty_corridor
+            nav_game = create_game(empty_config, color=True, label=True, res=(256, 144), visibility=True)
         
         if not save_validation:
             agent.name = 'test'
