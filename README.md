@@ -22,4 +22,4 @@ This agent was trained using ViZDoom: https://github.com/Farama-Foundation/ViZDo
 
 ---
 
-**P.S.** If you want to change the episode timeout setting to > 1050 for any scenario at Nightmare difficulty (skill level 5), note that enemies respawn after 35 seconds (1050 ticks) unless the Thing_Remove function is called in your ACS script to remove them or they die of special ways specifically defined in Doom's source code.
+**P.S.** If you want to change the episode timeout setting to > 1050 for any scenario at Nightmare difficulty (skill level 5), note that enemies respawn after 30 seconds (1050 ticks) unless the Thing_Remove function is called in your ACS script to remove them or they die of special ways specifically defined in Doom's source code.
