@@ -266,7 +266,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
                 all_scores[0].extend(train_scores)
                 all_scores[1].extend(train_kills)
                 
-                stats = plot_stat(train_scores, all_scores, train_quartiles, epoch, agent, bot, epoch_start, plot)
+                stats = plot_stat(train_scores, all_scores, train_quartiles, epoch, agent, bot, epoch_start)
                 
                 duration = int(time()-start);
                 timer = f"{duration//60:d} min {duration%60:d} sec"
@@ -533,7 +533,7 @@ def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomG
                 all_scores[0].extend(train_scores)
                 all_scores[1].extend(train_kills)
                 
-                stats = plot_stat(train_scores, all_scores, train_quartiles, epoch, agent, bot, epoch_start, plot)
+                stats = plot_stat(train_scores, all_scores, train_quartiles, epoch, agent, bot, epoch_start)
                 
                 duration = int(time()-start);
                 timer = f"{duration//60:d} min {duration%60:d} sec"
