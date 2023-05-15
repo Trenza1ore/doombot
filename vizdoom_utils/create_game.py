@@ -2,6 +2,22 @@ import vizdoom as vzd
 
 def create_game(config_path: str, color: bool=False, depth: bool=True, label: bool=False, 
                 automap: bool=False, res: tuple[int, int]=(256, 144), visibility: bool=False, *args, **kwargs) -> vzd.vizdoom.DoomGame:
+    """Creates a vizdoom game instance with configurable options
+
+    Args:
+        config_path (str): scenario configuration path
+        color (bool, optional): color (CRCGCB) or grayscale (GRAY8). Defaults to False.
+        depth (bool, optional): depth buffer availability. Defaults to True.
+        label (bool, optional): labels buffer availability. Defaults to False.
+        automap (bool, optional): automap buffer availability. Defaults to False.
+        res (tuple[int, int], optional): internal rendering resolution. Defaults to (256, 144).
+        visibility (bool, optional): whether to display game window. Defaults to False.
+        asyn (NoneType, optional): keyword argument, if present would set game to asynchronus mode.
+        spec (NoneType, optional): keyword argument, if present would set game to spectator mode.
+    Returns:
+        vzd.vizdoom.DoomGame: _description_
+    """    
+    
     
     # create an instance of doom game
     print("Initializing Doom... ", end='')

@@ -4,10 +4,16 @@ import traceback
 import os
 import time
 
+# config
 WEBHOOK_URL = "***REMOVED***"
 IMGBB_KEY = "***REMOVED***"
 
+if not os.path.exists("history"):
+    os.mkdir("history")
+
 class discord_bot:
+    """A discord bot class that utilizes discord webhook to send stats and plots during training 
+    """    
     def __init__(self, url: str = WEBHOOK_URL, extra: str=''):
         current_time = time.strftime("%y-%m-%d-%H-%M-%S")
         self.url = url
@@ -33,17 +39,6 @@ class discord_bot:
 
     def send_img(self, epoch_num: int):
         self.last_upload = []
-        
-        # file_names = [f"{self.path}/{epoch_num}.png", 
-        #               f"{self.path}/{epoch_num}a.png", 
-        #               f"{self.path}/train_quartiles.png", 
-        #               f"{self.path}/train_kill_counts.png"]
-        
-        # plt.clf()
-        # for i in range(4):
-        #     plt.subplot(2, 2, i+1)
-        #     plt.imshow(plt.imread(file_names[i]))
-        # plt.savefig("plots/current.png", dpi=100)
         
         with open(f"{self.path}/current.png", "rb") as file:
             url = "https://api.imgbb.com/1/upload"

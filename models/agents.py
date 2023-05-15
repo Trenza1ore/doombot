@@ -2,17 +2,25 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from numpy.random import default_rng
 import numpy as np
+import os
 
-from models.DQN import DQNv1, DRQNv1, DRQNv2
+from numpy.random import default_rng
+
+from models.DQN import DQNv1, DRQNv2
 from models.replay_memory import ReplayMemory
 from vizdoom_utils import *
 from time import time
 
+# template string for saving path of models and replay memory
 model_savepath = "pretrained/%s-model-doom-%d.pth"
 
+if not os.path.exists("pretrained"):
+    os.mkdir("pretrained")
+
 class CombatAgent:
+    '''My RL agent
+    '''
     def __init__(self, device: torch.device, mem_size: int, 
                  action_num: int, nav_action_num: int,
                  discount: float, lr: float, dropout, loss=nn.MSELoss, 
@@ -53,7 +61,7 @@ class CombatAgent:
             self.nav_net = nav_model(action_num=nav_action_num, dropout=dropout).to(device)
             self.nav_net.train()
         
-        # set up optimizer (a dict type lr means PPO is used)
+        # set up optimizer (a dict type lr means PPO is used) (PPO support has been dropped)
         if type(lr) == dict:
             self.act_optimizer = optimizer(self.act_net.parameters(), **lr)
             if not self.no_nav:
@@ -69,8 +77,7 @@ class CombatAgent:
         dtypes = [np.uint8, np.float16, 'bool', 'bool']
         dtypes.append('bool') if nav_req_feature else None
         self.memory = ReplayMemory(res=(72, 128), ch_num=3, size=mem_size, 
-                                   history_len=state_len-2, future_len=1, 
-                                   dtypes=dtypes)
+                                   history_len=state_len-2, dtypes=dtypes)
     
     def decide_move(self, state: np.ndarray, is_combat: bool) -> torch.tensor:
         state = torch.from_numpy(state).float().cuda()
@@ -91,12 +98,14 @@ class CombatAgent:
             return (torch.argmax(self.nav_net(state)).item(), False)
     
     def eval(self, mode: bool=True):
+        '''Sets the models to evaluation mode
+        '''
         if mode:
             self.act_net.eval()
-            self.nav_net.eval()
+            None if self.no_nav else self.nav_net.eval()
         else:
             self.act_net.train()
-            self.nav_net.train()
+            None if self.no_nav else self.nav_net.train()
     
     def add_mem(self, state: np.ndarray, action: int, reward: float, features: tuple[bool]):
         self.memory.add(state, reward, action, features)
@@ -222,7 +231,7 @@ class CombatAgent:
                 optimizer.step()
         self.eps = self.eps * self.eps_decay if self.eps > self.eps_min else self.eps_min
     
-    def nav_train(self, batch_size: int=5, feature_loss_factor: float=10.):
+    def nav_train(self, batch_size: int=5):
         indices = self.memory.replay_p_nav(batch_size)
         for i in indices:
             start, end  = i-self.history_len, i+2

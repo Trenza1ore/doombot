@@ -5,6 +5,22 @@ from stats.discord_webhook import discord_bot
 
 def plot_stat(train_scores: list, all_scores:list, train_quartiles: list, 
               epoch: int, agent: CombatAgent, bot: discord_bot, epoch_start: int=0, plot: bool=True) -> str:
+    """Helper function for saving and plotting stats locally, these can later be sent via discord
+
+    Args:
+        train_scores (list): training scores for current epoch
+        all_scores (list): training scores in index 0, training kills in index 1
+        train_quartiles (list): epoch quartiles for training scores
+        epoch (int): epoch index starting at 0
+        agent (CombatAgent): the RL agent
+        bot (discord_bot): the discord bot instance
+        epoch_start (int, optional): legacy option that does nothing. Defaults to 0.
+        plot (bool, optional): whether to plot the stats. Defaults to True.
+
+    Returns:
+        str: a sentence describing the stats
+    """    
+    
     train_scores = np.array(train_scores)
     Q1, Q2, Q3 = np.percentile(train_scores, 25), np.median(train_scores), np.percentile(train_scores, 75)
     mean = train_scores.mean()

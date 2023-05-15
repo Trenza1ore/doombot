@@ -1,30 +1,68 @@
-import itertools as it
-import os
-import numpy as np
-import torch
-import torch.nn as nn
 import vizdoom as vzd
 
 from time import sleep, time
 from tqdm import trange
 from random import randrange
-from torch.optim import SGD, Adam, Adagrad
 from capture_footage import capture
 
 from models import *
 from stats import *
 from vizdoom_utils import *
 
+# ============================== What is this ========================================
+# Helper functions for running training sessions for an RL agent
+# ====================================================================================
+
+class inf_ep_max:
+    """a class created to represent max value as Python 3's int has no such thing
+    """
+    def __eq__(self, __value: object) -> bool:
+        return False
+    def __gt__(self, __value: object) -> bool:
+        return True
+    def __ge__(self, __value: object) -> bool:
+        return True
+    def __lt__(self, __value: object) -> bool:
+        return False
+    def __le__(self, __value: object) -> bool:
+        return False
+
 def train_agent(game: vzd.vizdoom.DoomGame, 
                 agent: CombatAgent, action_space: list, nav_action_space: list, 
-                skip_training: bool=False, 
-                plot: bool=False, discord: bool=False, epoch_num: int=3, 
+                skip_training: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
-                downsampler=resize_cv_linear, res=(128, 72), random_runs=False,
-                ep_max=1000, save_interval=0
+                downsampler=resize_cv_linear, res: tuple[int, int]=(128, 72), 
+                random_runs: bool=False, ep_max: int=0, save_interval: int=0
                 ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+    """Runs a training session of an RL agent, with discord webhook support for sending statistics of training scores after each epoch of training.
+    Written in an unstructured manner to have marginal (yet existing) performance gains. Deadly corridor is better trained with train_agent_corridor.
+    
+    Args:
+        game (vzd.vizdoom.DoomGame): vizdoom game instance.
+        agent (CombatAgent): the RL agent to train.
+        action_space (list): action space for the combat model.
+        nav_action_space (list): action space for the navigation model.
+        skip_training (bool, optional): whether to skip training (for debug only). Defaults to False.
+        discord (bool, optional): whether to have discord webhook send training stats and plots after every epoch. Defaults to False.
+        epoch_num (int, optional): number of epoches to train (not necessarily reached if ep_max is set). Defaults to 3.
+        frame_repeat (int, optional): the number of frames to repeat. Defaults to 4.
+        epoch_step (int, optional): minimum number of steps in an epoch (the last episode in an epoch is always finished). Defaults to 500.
+        load_epoch (int, optional): legacy option, use the load_models method of agent instance instead. Defaults to -1.
+        downsampler (_type_, optional): downsampling algorithm to use, bilinear intepolation is the most balanced but nearest is slightly faster. Defaults to resize_cv_linear.
+        res (tuple[int, int], optional): downsampling algorithm's target resolution. Defaults to (128, 72).
+        random_runs (bool, optional): whether to include short, purely randomized episodes between epoches, minimum steps is set to 500. Defaults to False.
+        ep_max (int, optional): maximum episodes for this training session, checked after every epoch and overwrites epoch_num, 0=disable. Defaults to 0.
+        save_interval (int, optional): automatically save the models and replay memory every save_interval epoches, 0=disable. Defaults to 0.
+
+    Returns:
+        tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]: returns the agent, game instance and training scores
+    """    
+    
     if save_interval == 0:
         save_interval = epoch_num+1
+    
+    if ep_max <= 0:
+        ep_max = inf_ep_max()
         
     all_scores = [[], []]
     train_quartiles = [[], [], [], []]
@@ -39,7 +77,7 @@ def train_agent(game: vzd.vizdoom.DoomGame,
             
             action_space_size = len(action_space)
             nav_action_space_size = len(nav_action_space)
-            enemies = {"Zombieman","ShotgunGuy","MarineChainsawVzd","ChaingunGuy", "Demon", "HellKnight"}
+            enemies = {"Zombieman", "ShotgunGuy", "MarineChainsawVzd", "ChaingunGuy", "Demon", "HellKnight"}
             
             print("Initial filling of replay memory with random actions")
             terminated = False
@@ -260,14 +298,40 @@ def train_agent(game: vzd.vizdoom.DoomGame,
 
 def train_agent_corridor(game: vzd.vizdoom.DoomGame, nav_game: vzd.vizdoom.DoomGame,
                 agent: CombatAgent, action_space: list, nav_action_space: list, 
-                skip_training: bool=False, 
-                plot: bool=False, discord: bool=False, epoch_num: int=3, 
+                skip_training: bool=False, discord: bool=False, epoch_num: int=3, 
                 frame_repeat: int=4, epoch_step: int=500, load_epoch: int=-1, 
-                downsampler=resize_cv_linear, res=(128, 72), nav_runs=False,
-                ep_max=1000, save_interval=0
+                downsampler=resize_cv_linear, res: tuple[int, int]=(128, 72), 
+                nav_runs: bool=False, ep_max: int=0, save_interval: int=0
                 ) -> tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]:
+    """Runs a training session of an RL agent, with discord webhook support for sending statistics of training scores after each epoch of training.
+    Written in an unstructured manner to have marginal (yet existing) performance gains. Used specifically for training in deadly corridor.
+    
+    Args:
+        game (vzd.vizdoom.DoomGame): vizdoom game instance.
+        agent (CombatAgent): the RL agent to train.
+        action_space (list): action space for the combat model.
+        nav_action_space (list): action space for the navigation model.
+        skip_training (bool, optional): whether to skip training (for debug only). Defaults to False.
+        discord (bool, optional): whether to have discord webhook send training stats and plots after every epoch. Defaults to False.
+        epoch_num (int, optional): number of epoches to train (not necessarily reached if ep_max is set). Defaults to 3.
+        frame_repeat (int, optional): the number of frames to repeat. Defaults to 4.
+        epoch_step (int, optional): minimum number of steps in an epoch (the last episode in an epoch is always finished). Defaults to 500.
+        load_epoch (int, optional): legacy option, use the load_models method of agent instance instead. Defaults to -1.
+        downsampler (_type_, optional): downsampling algorithm to use, bilinear intepolation is the most balanced but nearest is slightly faster. Defaults to resize_cv_linear.
+        res (tuple[int, int], optional): downsampling algorithm's target resolution. Defaults to (128, 72).
+        nav_runs (bool, optional): whether to include short, navigation-only training between epoches, minimum steps is set to 500. Defaults to False.
+        ep_max (int, optional): maximum episodes for this training session, checked after every epoch and overwrites epoch_num, 0=disable. Defaults to 0.
+        save_interval (int, optional): automatically save the models and replay memory every save_interval epoches, 0=disable. Defaults to 0.
+
+    Returns:
+        tuple[CombatAgent, vzd.vizdoom.DoomGame, list[float]]: returns the agent, game instance and training scores
+    """    
+    
     if save_interval == 0:
         save_interval = epoch_num+1
+        
+    if ep_max <= 0:
+        ep_max = inf_ep_max()
     
     all_scores = [[], []]
     train_quartiles = [[], [], [], []]

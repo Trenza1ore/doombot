@@ -3,16 +3,19 @@ from numpy.random import choice, randint, default_rng, multinomial
 
 class ReplayMemory:
     def __init__(self, res: tuple[int, int]=(240, 320), ch_num: int=3, size: int=40000, nav: bool=True,
-                 history_len: int=6, future_len: int=1, dtypes: list[object]=[np.uint8, np.float32]):
-        """A class that implements replay memory for experience replay and prioritized experience replay.
+                 history_len: int=6, dtypes: list[object]=[np.uint8, np.float32]):
+        """A class that implements replay memory for prioritized experience replay.
 
         Args:
             res (tuple[int, int], optional): resolution in form of (height, width). Defaults to (240, 320).
             ch_num (int): number of colour channels. Defaults to 3.
             size (int): maximum size, starts deleting old memories after maximum reached. Defaults to 40000.
+            nav (bool, optional): whether navigation model is used. Defaults to True.
+            history_len (int, optional): number of history states. Defaults to 6.
             dtypes (list[object]): data type of frame, reward and (if any) features, datatype for features 
             should be passed in as strings like "np.uint8" or "bool". Defaults to [np.uint8, np.float32].
-        """
+        """        
+        
         self.max_size = size
         self.max_index = size - 1
         self.ch_num = ch_num
@@ -37,7 +40,8 @@ class ReplayMemory:
         if not nav:
             self.replay_p = self.replay_p_no_check
             self.replay_p_filled = self.replay_p_filled_no_check
-            
+        
+        # try to minimize memory usage
         if size < 65_536:
             self.indices = np.arange(size, dtype=np.uint16)
         elif size < 4_294_967_296:
@@ -48,11 +52,11 @@ class ReplayMemory:
         self.frames = np.zeros((size, ch_num, *res), dtype=dtypes[0])
         self.rewards = np.zeros(size, dtype=dtypes[1])
         self.actions = np.zeros(size, dtype=np.uint8)
-        self.isTerminate = np.full(size, False)
         
         self.__ptr = -1
         self.rng = default_rng()
-        
+    
+    # functions for ease of checking
     def __len__(self) -> int:
         return self.__ptr + 1
     
@@ -62,8 +66,11 @@ class ReplayMemory:
     def __repr__(self) -> str:
         return self.__str__()
     
+    # add is replaced by add_filled after the memory has been filled once
     def add(self, frame: np.ndarray[np.integer], reward: np.floating, action: np.uint8,
             features: tuple):
+        """Add a single state into memory
+        """        
         if self.__ptr < self.max_index:
             self.__ptr += 1
         else:
@@ -75,17 +82,21 @@ class ReplayMemory:
         self.rewards[self.__ptr] = reward
         self.actions[self.__ptr] = action
         self.features[self.__ptr, :] = features
-        
+    
     def add_filled(self, frame: np.ndarray[np.integer], reward: np.floating, action: np.uint8,
             features: tuple):
+        """Add a single state into memory
+        """        
         self.__ptr = self.__ptr + 1 if self.__ptr < self.max_index else 0
         self.frames[self.__ptr, :, :, :] = frame
         self.rewards[self.__ptr] = reward
         self.actions[self.__ptr] = action
         self.features[self.__ptr, :] = features
 
-    # First pass version
+    # replay_p is replaced by replay_p_filled after the memory has been filled once
     def replay_p(self, n: int, r: bool=True, scores=0) -> np.ndarray[np.unsignedinteger]:
+        """sample states for prioritized experience replay
+        """
         if scores is 0: # if scores == None won't work with numpy arrays...
             scores = np.asfarray(self.rewards)
             # Normalize before setting unpickable states to 0
@@ -95,12 +106,16 @@ class ReplayMemory:
             scores[self.__ptr:] = 0
             scores /= np.sum(scores)
         indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
+        
+        # re-roll because selection contains invalid states for training
+        # (navigation and combat states mixed together)
         if np.any(self.features[indices, 0] != self.features[indices+1, 0]):
             return self.replay_p(n, r, scores)
         return indices
     
-    # After memory's filled
     def replay_p_filled(self, n: int, r: bool=True, scores=0) -> np.ndarray[np.unsignedinteger]:
+        """sample states for prioritized experience replay
+        """
         if scores is 0: # if scores == None won't work with numpy arrays...
             scores = np.asfarray(self.rewards)
             # Normalize before setting unpickable states to 0
@@ -111,12 +126,17 @@ class ReplayMemory:
             scores[-1] = 0
             scores /= np.sum(scores)
         indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
+        
+        # re-roll because selection contains invalid states for training
+        # (navigation and combat states mixed together)
         if np.any(self.features[indices, 0] != self.features[indices+1, 0]):
             return self.replay_p(n, r, scores)
         return indices
     
-    # First pass version
+    # replay_p_no_check is replaced by replay_p_filled_no_check after the memory has been filled once
     def replay_p_no_check(self, n: int, r: bool=True) -> np.ndarray[np.unsignedinteger]:
+        """sample states for prioritized experience replay (doesn't validate selected states)
+        """
         scores = np.asfarray(self.rewards)
         # Normalize before setting unpickable states to 0
         # Since negative rewards exist
@@ -127,8 +147,9 @@ class ReplayMemory:
         indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
         return indices
     
-    # After memory's filled
     def replay_p_filled_no_check(self, n: int, r: bool=True) -> np.ndarray[np.unsignedinteger]:
+        """sample states for prioritized experience replay (doesn't validate selected states)
+        """
         scores = np.asfarray(self.rewards)
         # Normalize before setting unpickable states to 0
         # Since negative rewards exist
@@ -140,8 +161,10 @@ class ReplayMemory:
         indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
         return indices
     
-    # First pass version
+    # replay_p_nav is replaced by replay_p_nav_filled after the memory has been filled once
     def replay_p_nav(self, n: int, r: bool=True) -> np.ndarray[np.unsignedinteger]:
+        """sample states for prioritized experience replay (for navigation model)
+        """
         scores = np.asfarray(self.rewards)
         # Normalize before setting unpickable states to 0
         # Since negative rewards exist
@@ -153,8 +176,9 @@ class ReplayMemory:
         indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
         return indices
     
-    # After memory's filled
     def replay_p_nav_filled(self, n: int, r: bool=True) -> np.ndarray[np.unsignedinteger]:
+        """sample states for prioritized experience replay (for navigation model)
+        """
         scores = np.asfarray(self.rewards)
         # Normalize before setting unpickable states to 0
         # Since negative rewards exist
@@ -167,7 +191,7 @@ class ReplayMemory:
         indices = self.rng.choice(self.indices, size=n, replace=r, p=scores)
         return indices
     
-    # Legacy code that I still want to keep as reference
+    # Legacy code kept as reference
     
     # def bulk_add_unsafe(self, frame: np.ndarray[np.integer], reward: np.ndarray[np.floating], 
     #                     actions: np.ndarray[np.uint8], features: np.ndarray, n: int):

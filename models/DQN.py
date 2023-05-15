@@ -4,6 +4,12 @@ import torch.nn as nn
 model_savepath = "pretrained/model-doom-%d.pth"
 
 class DQNv1(nn.Module):
+    '''A DQN model with this structure:
+    (   3 channels) -> conv(3x3 kernel, stride 1, 64 channels) -(dropout)-> avg_pool(2x2 kernel, stride 2) -> ReLU
+    (  64 channels) -> conv(3x3 kernel, stride 1, 32 channels) -(dropout)-> avg_pool(2x2 kernel, stride 2) -> ReLU
+    (  32 channels) -> conv(3x3 kernel, stride 1, 16 channels) -(dropout)-> ReLU -> Flatten(6272)
+    (6272 in nodes) -(dropout)-> linear(6272, 1568) -> ReLU -> linear(1568, action_num) -> ReLU -> action values
+    '''
     def __init__(self, action_num: int, dropout: float=0):
         super().__init__()
         if dropout == 0:
@@ -69,6 +75,8 @@ class DQNv1(nn.Module):
         return self.hidden_layers(x)
 
 class DRQNv1(nn.Module):
+    '''Legacy code
+    '''
     def __init__(self, action_num: int, feature_num: int):
         super().__init__()
         
@@ -105,6 +113,14 @@ class DRQNv1(nn.Module):
         return (feature, actions)
         
 class DRQNv2(DQNv1):
+    '''A DQN model with this structure:
+    (   3 channels) -> conv(3x3 kernel, stride 1, 64 channels) -(dropout)-> avg_pool(2x2 kernel, stride 2) -> ReLU
+    (  64 channels) -> conv(3x3 kernel, stride 1, 32 channels) -(dropout)-> avg_pool(2x2 kernel, stride 2) -> ReLU
+    (  32 channels) -> conv(3x3 kernel, stride 1, 16 channels) -(dropout)-> ReLU -> Flatten(6272)
+    (6272 in nodes) -(clone)-> [branch 0], [branch 1]
+    [branch 0] -(dropout)-> linear(6272, 1568) -> Sigmoid -> linear(1568, feature_num) -> Sigmoid -> feature prediction
+    [branch 1] -> LSTM(hidden_size=action_num, 2 layers, dropout) -> action values
+    '''
     def __init__(self, action_num: int, feature_num: int, dropout: float=0):
         super().__init__(action_num, dropout)
         
