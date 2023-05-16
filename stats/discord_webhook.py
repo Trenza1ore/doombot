@@ -5,8 +5,8 @@ import os
 import time
 
 # config
-WEBHOOK_URL = "***REMOVED***"
-IMGBB_KEY = "***REMOVED***"
+WEBHOOK_URL = ""
+IMGBB_KEY = ""
 
 if not os.path.exists("history"):
     os.mkdir("history")
