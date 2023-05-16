@@ -17,7 +17,7 @@ Scenarios tested:
 
 ---
 
-This project was developed using Python 3.10.9 on a laptop with a CUDA-enabled graphics card. 
+This project was developed using **Python 3.10.9** on a laptop with a CUDA-enabled graphics card. 
 Only ~1.6GB of video memory is needed according to my testing, so it should be able to run even on entry-level Nvidia graphics cards like MX 150/GT 1030.
 Remove all .cuda() function calls if trained using CPU instead.
 
