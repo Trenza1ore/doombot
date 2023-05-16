@@ -9,7 +9,7 @@ from torch.optim import SGD, Adam, Adagrad
 
 from models import *
 from vizdoom_utils import *
-from training_procedure import *
+from models.training_procedure import *
 
 # ============================== What is this ========================================
 # The main program to run training sessions

@@ -6,13 +6,11 @@ import shutil
 from tqdm import trange
 from PIL import Image
 
-from models import CombatAgent
-
 # ============================== What is this ========================================
 # Helper functions for capturing testing footage for RL agent into gif files
 # ====================================================================================
 
-def capture(agent: CombatAgent, game: vzd.vizdoom.DoomGame, repeat: int,
+def capture(agent: object, game: vzd.vizdoom.DoomGame, repeat: int,
             action_space: list, nav_action_space: list, downsampler, 
             res: tuple[int, int]=(128, 72), episodes_to_capture: int=20, 
             cheat: bool=False):
@@ -20,7 +18,7 @@ def capture(agent: CombatAgent, game: vzd.vizdoom.DoomGame, repeat: int,
     It would create a folder in root directory of doombot named after the agent.
 
     Args:
-        agent (CombatAgent): the RL agent.
+        agent (object): the RL agent.
         game (vzd.vizdoom.DoomGame): vizdoom game instance.
         repeat (int): the number of frames to repeat actions for.
         action_space (list): action space for the combat model.
@@ -33,7 +31,7 @@ def capture(agent: CombatAgent, game: vzd.vizdoom.DoomGame, repeat: int,
     
     if not cheat:
         agent.eval()
-        
+    
     name = agent.name
     repeat_iterator = [0]*repeat
     
@@ -44,6 +42,8 @@ def capture(agent: CombatAgent, game: vzd.vizdoom.DoomGame, repeat: int,
         shutil.rmtree(name)
     
     os.mkdir(name)
+    
+    print(f"Capturing {episodes_to_capture} episodes of {name}")
     
     for i in trange(episodes_to_capture):
         terminated = False

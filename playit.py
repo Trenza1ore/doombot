@@ -8,13 +8,13 @@ from vizdoom_utils import resize_cv_linear, create_game
 # ====================================================================================
 
 # config
-is_recording = True
-res = (256, 144)
-#res=(1920, 1080)
+is_recording = False
+#res = (256, 144)
+res = (1920, 1080)
 resize_res = (128, 72)
 
-#config_file_path = os.path.join(vzd.scenarios_path, "deathmatch.cfg")
 config_file_path = os.path.join(vzd.scenarios_path, "deathmatch_hugo.cfg")
+#config_file_path = os.path.join(vzd.scenarios_path, "hanger_test.cfg")
 #config_file_path = os.path.join(vzd.scenarios_path, "deadly_corridor_hugo.cfg")
 
 # create folder for holding screenshots
@@ -36,3 +36,4 @@ while True:
             imsave(f"screenshots/{i}.png", frame.transpose(1,2,0))
             imsave(f"screenshots/low_res_{i}.png", frame_lr.transpose(1,2,0))
         game.advance_action()
+    print(f"You scored: {game.get_total_reward():.2f}")

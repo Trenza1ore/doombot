@@ -3,7 +3,7 @@ import vizdoom as vzd
 from time import sleep, time
 from tqdm import trange
 from random import randrange
-from capture_footage import capture
+from vizdoom_utils import capture
 
 from models import *
 from stats import *
